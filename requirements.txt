@@ -1,0 +1,31 @@
+# APIサーバ本体（LINE Webhook / 外部API / OpenAI をまとめて処理）
+fastapi==0.115.6
+
+# FastAPIを起動するASGIサーバ
+# --reload で開発時のホットリロードに使う
+uvicorn[standard]==0.32.1
+
+# .env ファイルから環境変数を読み込む
+# APIキーをコードに直書きしないために使用
+python-dotenv==1.0.1
+
+# 外部API（Google Placesなど）を呼び出すHTTPクライアント
+# 非同期対応
+httpx==0.27.2
+
+# データ構造の型チェック・バリデーション用
+# FastAPIと組み合わせて使用
+pydantic==2.10.3
+
+# PostgreSQL（Supabase）接続用ドライバ
+# user_profiles テーブルへの SELECT / INSERT / UPDATE に使用
+psycopg[binary]==3.2.3
+
+# LINE Messaging API 用SDK
+# Webhook署名検証・メッセージ返信に使用
+line-bot-sdk==3.14.2
+
+# OpenAI API クライアント
+# 嗜好抽出・おすすめ理由生成を APIサーバ経由で行う
+openai==1.57.0
+
