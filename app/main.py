@@ -1,13 +1,25 @@
-from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Query
 import logging
+import math
 
 from app.services.places import search_nearby, PlacesUpstreamError
 
 app = FastAPI()
-
 logger = logging.getLogger("uvicorn.error")
 
+
+# 距離計算関数（簡易ピタゴラス距離）
+def flat_distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    km_per_deg_lat = 111.32
+    km_per_deg_lng = 111.32 * math.cos(math.radians(lat1))  # 緯度補正だけ入れる簡易版
+
+    dx = (lng2 - lng1) * km_per_deg_lng
+    dy = (lat2 - lat1) * km_per_deg_lat
+
+    return math.sqrt(dx * dx + dy * dy)
+
+
+# Google Places apiで検索をかけて結果をjsonで取ってくる
 @app.get("/shops/search")
 async def shops_search(
     lat: float = Query(...),
@@ -42,13 +54,22 @@ async def shops_search(
     items = []
     for r in results:
         loc = (r.get("geometry") or {}).get("location") or {}
+        shop_lat = loc.get("lat")
+        shop_lng = loc.get("lng")
+
+        # 位置が取れないデータはスキップ
+        if shop_lat is None or shop_lng is None:
+            continue
+
+        km = flat_distance_km(lat, lng, shop_lat, shop_lng)
+
         items.append({
             "place_id": r.get("place_id"),
             "name": r.get("name"),
             "vicinity": r.get("vicinity"),
-            "lat": loc.get("lat"),
-            "lng": loc.get("lng"),
+            "lat": shop_lat,
+            "lng": shop_lng,
+            "distance_km": km,
         })
 
     return {"items": items, "count": len(items)}
-
