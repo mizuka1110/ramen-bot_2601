@@ -51,7 +51,18 @@ async def line_webhook(request: Request):
                 [
                     {
                         "type": "text",
-                        "text": "🍜 了解！\n📍現在地を送ってね",
+                        "text": "🍜 了解！\n下のボタンから現在地を送ってね👇",
+                        "quickReply": {
+                             "items": [
+                                {
+                                    "type": "action",
+                                    "action": {
+                                        "type": "location",
+                                        "label": "現在地を送る 📍",
+                                    },
+                                }
+                            ]
+                        },
                     }
                 ],
             )
@@ -96,8 +107,8 @@ async def line_webhook(request: Request):
             radius=1000,
         )
 
-        items = (result.get("results") or [])[:10]
-        if not items:
+        raw_items = (result.get("results") or [])[:10]
+        if not raw_items:
             await line_push(
                 user_id,
                 [
@@ -110,12 +121,28 @@ async def line_webhook(request: Request):
             user_states[user_id] = WAITING_NONE
             return {"ok": True}
 
-        # Flexカルーセル生成（既存ロジックを利用）
-        flex = build_flex_carousel(
-            await search_nearby(lat=lat, lng=lng, q="ラーメン", radius=1000)
-            .get("items", [])
-        )
+        # Googleの result → Flex用item に変換
+        items = []
+        for r in raw_items:
+            loc = (r.get("geometry") or {}).get("location") or {}
+            if not loc.get("lat") or not loc.get("lng"):
+                continue
 
+            items.append(
+                {
+                    "name": r.get("name"),
+                    "vicinity": r.get("vicinity"),
+                    "lat": loc["lat"],
+                    "lng": loc["lng"],
+                    "open_now": (r.get("opening_hours") or {}).get("open_now"),
+                    "rating": r.get("rating"),
+                    "rating_count": r.get("user_ratings_total"),
+                    "photo_reference": (
+                        (r.get("photos") or [{}])[0].get("photo_reference")
+                    ),
+                }
+            )
+        flex = build_flex_carousel(items)
         await line_push(user_id, [flex])
 
         # ステート初期化
