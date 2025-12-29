@@ -29,6 +29,8 @@ async def search_nearby(lat: float, lng: float, q: str, radius: int) -> dict:
         "radius": radius,            # 検索半径（m）
         "keyword": q,                # 検索ワード（ラーメン等）
         "key": GOOGLE_PLACES_API_KEY,
+        "language": "ja",
+        "region": "jp",
     }
 
     async with httpx.AsyncClient(timeout=10.0) as client:

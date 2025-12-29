@@ -11,7 +11,7 @@ from app.services.places import search_nearby, PlacesUpstreamError
 from app.config import GOOGLE_PLACES_API_KEY
 from app.services.line_client import line_push
 from app.line.webhook import router as line_router
-from app.line.messages import build_flex_carousel
+from app.line.messages import build_flex_carousel, _photo_url
 
 app = FastAPI()
 logger = logging.getLogger("uvicorn.error")
@@ -63,8 +63,9 @@ async def shops_search(
         raise HTTPException(status_code=500, detail="Upstream error")
 
     results = (data.get("results") or [])[:10]
-
+    
     items: list[dict] = []
+    
     for r in results:
         loc = (r.get("geometry") or {}).get("location") or {}
         shop_lat = loc.get("lat")
@@ -293,20 +294,24 @@ async def debug_push(lat: float, lng: float):
             raise ValueError("LINE_USER_ID is empty")
 
         result = await shops_search(lat=lat, lng=lng, q="ラーメン", radius=1000)
-        items = result.get("items") if isinstance(result, dict) else None
-        if not items:
-            raise ValueError(f"shops_search returned no items: {result}")
+        items = result.get("items") if isinstance(result, dict) else []
 
-        # ここで hero.url の例をログに出す（写真が出ない時の最短デバッグ）
+        if not items:
+            await line_push(user_id, [{
+                "type": "text",
+                "text": "近くにラーメン屋が見つからなかったよ…🍜"
+            }])
+            return {"ok": True, "count": 0}
+
         logger.info("PUBLIC_BASE_URL=%s", os.getenv("PUBLIC_BASE_URL"))
-        logger.info("hero_url_example=%s", _photo_url(items[0].get("photo_reference")))
 
         flex = build_flex_carousel(items)
         await line_push(user_id, [flex])
 
-        return {"ok": True}
+        return {"ok": True, "count": len(items)}
 
     except Exception as e:
         logger.exception("debug_push failed")
         raise HTTPException(status_code=500, detail=str(e))
+
     #－－－－－－－－－－－－テストここまでーーーーーーーーーーーーーー

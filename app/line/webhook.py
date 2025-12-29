@@ -142,6 +142,13 @@ async def line_webhook(request: Request):
                     ),
                 }
             )
+        if not items:
+            await line_push(user_id, [{
+        "type": "text",
+        "text": "近くにラーメン屋が見つからなかったよ…🍜"
+            }])
+            return {"ok": True}
+        
         flex = build_flex_carousel(items)
         await line_push(user_id, [flex])
 
