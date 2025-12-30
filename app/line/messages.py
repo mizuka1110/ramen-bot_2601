@@ -5,8 +5,8 @@ def _open_label(open_now: bool | None) -> tuple[str, str]:
     if open_now is True:
         return ("営業中", "#16A34A")
     if open_now is False:
-        return ("営業時間外", "#6B7280")
-    return ("営業時間不明", "#6B7280")
+        return ("時間外", "#6B7280")
+    return ("不明", "#6B7280")
 
 
 def _photo_url(photo_reference: str | None, maxwidth: int = 600) -> str:
@@ -60,8 +60,13 @@ def shop_to_bubble(item: dict) -> dict:
                     "size": "xxs",
                     "weight": "bold",
                     "color": "#FFFFFF",
+                    "align": "center", 
+                    "gravity": "center", 
+                    "flex": 0    
                 }
             ],
+            "justifyContent": "center", 
+            "alignItems": "center", 
             "backgroundColor": label_bg,
             "cornerRadius": "999px",
             "paddingAll": "4px",
@@ -74,7 +79,7 @@ def shop_to_bubble(item: dict) -> dict:
             "type": "text",
             "text": item.get("name") or "-",
             "weight": "bold",
-            "size": "md",
+            "size": "lg",
             "wrap": True,
         },
         {
@@ -131,7 +136,7 @@ def build_flex_carousel(items: list[dict]) -> dict:
     bubbles = [shop_to_bubble(x) for x in (items or [])[:10]]
     return {
         "type": "flex",
-        "altText": "近くのお店",
+        "altText": "近くのラーメン店",
         "contents": {
             "type": "carousel",
             "contents": bubbles,
