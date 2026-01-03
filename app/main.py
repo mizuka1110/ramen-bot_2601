@@ -11,7 +11,7 @@ from app.services.places import search_nearby, PlacesUpstreamError
 from app.config import GOOGLE_PLACES_API_KEY
 from app.services.line_client import line_push
 from app.line.webhook import router as line_router
-from app.line.messages import build_flex_carousel, _photo_url
+from app.line.messages import build_flex_carousel
 
 app = FastAPI()
 logger = logging.getLogger("uvicorn.error")
@@ -63,9 +63,9 @@ async def shops_search(
         raise HTTPException(status_code=500, detail="Upstream error")
 
     results = (data.get("results") or [])[:10]
-    
+
     items: list[dict] = []
-    
+
     for r in results:
         loc = (r.get("geometry") or {}).get("location") or {}
         shop_lat = loc.get("lat")
@@ -87,7 +87,9 @@ async def shops_search(
         if not place_id:
             continue
 
-        maps_url = f"https://www.google.com/maps/search/?api=1&query_place_id={place_id}"
+        maps_url = (
+            f"https://www.google.com/maps/search/?api=1&query_place_id={place_id}"
+        )
 
         items.append(
             {
@@ -109,7 +111,9 @@ async def shops_search(
 
 
 @app.get("/shops/photo")
-async def shops_photo(ref: str = Query(...), maxwidth: int = Query(600, ge=64, le=1600)):
+async def shops_photo(
+    ref: str = Query(...), maxwidth: int = Query(600, ge=64, le=1600)
+):
     """
     Google Photo API を代理で叩いて、画像バイナリを返す
     (Flexの hero.url から参照する)
@@ -207,7 +211,7 @@ async def shops_photo(ref: str = Query(...), maxwidth: int = Query(600, ge=64, l
 #             "paddingStart": "10px",
 #             "paddingEnd": "10px",
 #             "flex": 0,
-#             "maxWidth": "55px", 
+#             "maxWidth": "55px",
 #         },
 #         {
 #             "type": "text",
@@ -233,7 +237,7 @@ async def shops_photo(ref: str = Query(...), maxwidth: int = Query(600, ge=64, l
 #             "color": "#111827",
 #             "wrap": True,
 #         })
-    
+
 #     return {
 #         "type": "bubble",
 #         "hero": {
@@ -297,10 +301,10 @@ async def debug_push(lat: float, lng: float):
         items = result.get("items") if isinstance(result, dict) else []
 
         if not items:
-            await line_push(user_id, [{
-                "type": "text",
-                "text": "近くにラーメン屋が見つからなかったよ…🍜"
-            }])
+            await line_push(
+                user_id,
+                [{"type": "text", "text": "近くにラーメン屋が見つからなかったよ…🍜"}],
+            )
             return {"ok": True, "count": 0}
 
         logger.info("PUBLIC_BASE_URL=%s", os.getenv("PUBLIC_BASE_URL"))
@@ -314,4 +318,4 @@ async def debug_push(lat: float, lng: float):
         logger.exception("debug_push failed")
         raise HTTPException(status_code=500, detail=str(e))
 
-    #－－－－－－－－－－－－テストここまでーーーーーーーーーーーーーー
+    # －－－－－－－－－－－－テストここまでーーーーーーーーーーーーーー

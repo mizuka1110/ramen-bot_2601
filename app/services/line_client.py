@@ -3,8 +3,10 @@ import os
 
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
+
 class LinePushError(Exception):
     pass
+
 
 async def line_push(to_user_id: str, messages: list[dict]) -> None:
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
