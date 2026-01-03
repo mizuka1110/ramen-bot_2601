@@ -1,5 +1,5 @@
 import os
-from typing import Tuple
+
 
 def _open_label(open_now: bool | None) -> tuple[str, str]:
     if open_now is True:
@@ -44,10 +44,10 @@ def shop_to_bubble(item: dict) -> dict:
     lng = item.get("lng")
 
     map_url = (
-    f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
-    if lat and lng
-    else item.get("maps_url")
-)
+        f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+        if lat and lng
+        else item.get("maps_url")
+    )
 
     body_contents = [
         {
@@ -60,20 +60,20 @@ def shop_to_bubble(item: dict) -> dict:
                     "size": "xxs",
                     "weight": "bold",
                     "color": "#FFFFFF",
-                    "align": "center", 
-                    "gravity": "center", 
-                    "flex": 0    
+                    "align": "center",
+                    "gravity": "center",
+                    "flex": 0,
                 }
             ],
-            "justifyContent": "center", 
-            "alignItems": "center", 
+            "justifyContent": "center",
+            "alignItems": "center",
             "backgroundColor": label_bg,
             "cornerRadius": "999px",
             "paddingAll": "4px",
             "paddingStart": "10px",
             "paddingEnd": "10px",
             "flex": 0,
-            "maxWidth": "55px", 
+            "maxWidth": "55px",
         },
         {
             "type": "text",
@@ -92,14 +92,16 @@ def shop_to_bubble(item: dict) -> dict:
     ]
 
     if rating_text:
-        body_contents.append({
-            "type": "text",
-            "text": rating_text,
-            "size": "sm",
-            "color": "#111827",
-            "wrap": True,
-        })
-    
+        body_contents.append(
+            {
+                "type": "text",
+                "text": rating_text,
+                "size": "sm",
+                "color": "#111827",
+                "wrap": True,
+            }
+        )
+
     return {
         "type": "bubble",
         "hero": {
@@ -119,15 +121,17 @@ def shop_to_bubble(item: dict) -> dict:
             "type": "box",
             "layout": "vertical",
             "spacing": "sm",
-            "contents": [{
-                "type": "button",
-                "style": "secondary",
-                "action": {
-                    "type": "uri",
-                    "label": "地図アプリを開く ",
-                    "uri": map_url,
-                },
-            }],
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "secondary",
+                    "action": {
+                        "type": "uri",
+                        "label": "地図アプリを開く ",
+                        "uri": map_url,
+                    },
+                }
+            ],
         },
     }
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 import logging
 
-from app.services.places import search_nearby
+from app.services.places import search_nearby, nearby_result_to_items
 from app.services.line_client import line_push
 from app.line.messages import build_flex_carousel
 
@@ -15,6 +15,7 @@ WAITING_NONE = "none"
 WAITING_LOCATION = "waiting_location"
 
 user_states: dict[str, str] = {}
+
 
 # =========================
 # LINE Webhook
@@ -53,7 +54,7 @@ async def line_webhook(request: Request):
                         "type": "text",
                         "text": "🍜 了解！\n下のボタンから現在地を送ってね👇",
                         "quickReply": {
-                             "items": [
+                            "items": [
                                 {
                                     "type": "action",
                                     "action": {
@@ -107,8 +108,10 @@ async def line_webhook(request: Request):
             radius=1000,
         )
 
-        raw_items = (result.get("results") or [])[:10]
-        if not raw_items:
+        # ★変更: raw_items + forループをやめて、共通関数で items を作る（distance_m 入る）
+        items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
+
+        if not items:
             await line_push(
                 user_id,
                 [
@@ -121,34 +124,6 @@ async def line_webhook(request: Request):
             user_states[user_id] = WAITING_NONE
             return {"ok": True}
 
-        # Googleの result → Flex用item に変換
-        items = []
-        for r in raw_items:
-            loc = (r.get("geometry") or {}).get("location") or {}
-            if not loc.get("lat") or not loc.get("lng"):
-                continue
-
-            items.append(
-                {
-                    "name": r.get("name"),
-                    "vicinity": r.get("vicinity"),
-                    "lat": loc["lat"],
-                    "lng": loc["lng"],
-                    "open_now": (r.get("opening_hours") or {}).get("open_now"),
-                    "rating": r.get("rating"),
-                    "rating_count": r.get("user_ratings_total"),
-                    "photo_reference": (
-                        (r.get("photos") or [{}])[0].get("photo_reference")
-                    ),
-                }
-            )
-        if not items:
-            await line_push(user_id, [{
-        "type": "text",
-        "text": "近くにラーメン屋が見つからなかったよ…🍜"
-            }])
-            return {"ok": True}
-        
         flex = build_flex_carousel(items)
         await line_push(user_id, [flex])
 
