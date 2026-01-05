@@ -100,35 +100,46 @@ async def line_webhook(request: Request):
         lat = message["latitude"]
         lng = message["longitude"]
 
-        # Nearby Search
+    # Nearby Search
+    try:
         result = await search_nearby(
             lat=lat,
             lng=lng,
             q="ラーメン",
             radius=1000,
         )
-
-        # ★変更: raw_items + forループをやめて、共通関数で items を作る（distance_m 入る）
-        items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
-
-        if not items:
-            await line_push(
-                user_id,
-                [
-                    {
-                        "type": "text",
-                        "text": "近くにラーメン屋が見つからなかったよ…🍜",
-                    }
-                ],
-            )
-            user_states[user_id] = WAITING_NONE
-            return {"ok": True}
-
-        flex = build_flex_carousel(items)
-        await line_push(user_id, [flex])
-
-        # ステート初期化
+    except Exception:
+        await line_push(
+            user_id,
+            [
+                {
+                    "type": "text",
+                    "text": "今ちょっと検索できないみたい🙏 時間が経ってから試してね🙏",
+                }
+            ],
+        )
         user_states[user_id] = WAITING_NONE
         return {"ok": True}
 
+    # ★共通関数で items を作る（distance_m 入る）
+    items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
+
+    if not items:
+        await line_push(
+            user_id,
+            [
+                {
+                    "type": "text",
+                    "text": "近くにラーメン屋が見つからなかったよ…🍜",
+                }
+            ],
+        )
+        user_states[user_id] = WAITING_NONE
+        return {"ok": True}
+
+    flex = build_flex_carousel(items)
+    await line_push(user_id, [flex])
+
+    # ステート初期化
+    user_states[user_id] = WAITING_NONE
     return {"ok": True}
