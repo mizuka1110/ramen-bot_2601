@@ -81,7 +81,9 @@ def _flat_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
     return int(round(math.sqrt(dx * dx + dy * dy) * 1000))
 
 
-def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit: int = 10) -> list[dict]:
+def nearby_result_to_items(
+    result: dict, user_lat: float, user_lng: float, limit: int = 10
+) -> list[dict]:
     """Google Nearby Search の生JSON → Flex用 items（distance_m入り）に変換"""
     raw_items = (result.get("results") or [])[:limit]
 
@@ -102,8 +104,12 @@ def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit
                 "open_now": (r.get("opening_hours") or {}).get("open_now"),
                 "rating": r.get("rating"),
                 "rating_count": r.get("user_ratings_total"),
-                "photo_reference": ((r.get("photos") or [{}])[0].get("photo_reference")),
-                "distance_m": _flat_distance_m(user_lat, user_lng, lat, lng),  # ← messages.py がこれを見る
+                "photo_reference": (
+                    (r.get("photos") or [{}])[0].get("photo_reference")
+                ),
+                "distance_m": _flat_distance_m(
+                    user_lat, user_lng, lat, lng
+                ),  # ← messages.py がこれを見る
             }
         )
 
