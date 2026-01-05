@@ -112,6 +112,7 @@
 │  │  ├─ webhook.py        # Webhook受信・署名検証
 │  │  └─ messages.py       # テキスト / カルーセル定義
 │  ├─ services/
+│  │  ├─ places_cache.py   # places結果キャッシュ
 │  │  ├─ places.py         # Google Places API 呼び出し
 │  │  ├─ llm.py            # OpenAI連携（生成・抽出）
 │  │  └─ profile.py        # DB操作（user_profiles）
