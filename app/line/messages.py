@@ -1,6 +1,5 @@
 import os
 
-
 def _open_label(open_now: bool | None) -> tuple[str, str]:
     if open_now is True:
         return ("営業中", "#16A34A")
@@ -40,13 +39,14 @@ def shop_to_bubble(item: dict) -> dict:
         rating_text = f"★{rating}"
         if rating_count is not None:
             rating_text += f"（{rating_count}）"
+
     lat = item.get("lat")
     lng = item.get("lng")
 
     map_url = (
         f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
-        if lat and lng
-        else item.get("maps_url")
+        if lat is not None and lng is not None
+        else (item.get("maps_url") or "https://www.google.com/maps")
     )
 
     body_contents = [
@@ -102,6 +102,18 @@ def shop_to_bubble(item: dict) -> dict:
             }
         )
 
+    summary = item.get("review_summary")
+    if summary:
+        body_contents.append(
+            {
+                "type": "text",
+                "text": summary,
+                "size": "sm",
+                "color": "#374151",
+                "wrap": True,
+            }
+        )
+
     return {
         "type": "bubble",
         "hero": {
@@ -137,7 +149,9 @@ def shop_to_bubble(item: dict) -> dict:
 
 
 def build_flex_carousel(items: list[dict]) -> dict:
-    bubbles = [shop_to_bubble(x) for x in (items or [])[:10]]
+    # 念のため None 混入を防ぐ（shop_to_bubbleは基本None返さない想定）
+    bubbles = [b for b in (shop_to_bubble(x) for x in (items or [])[:10]) if b]
+
     return {
         "type": "flex",
         "altText": "近くのラーメン店",
