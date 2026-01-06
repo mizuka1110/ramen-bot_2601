@@ -69,6 +69,11 @@
     **「おすすめ理由」を生成**
   - ユーザー嗜好を踏まえた自然文生成
 
+  ##### OpenAI 設定
+- 使用モデル: gpt-4o-mini
+- 環境変数: OPENAI_API_KEY を各自設定
+- responses API を使用（openai>=2.x）
+
 ---
 
 #### 4) 過去対話を踏まえた回答
@@ -113,6 +118,7 @@
 │  │  └─ messages.py       # テキスト / カルーセル定義
 │  ├─ services/
 │  │  ├─ places_cache.py   # places結果キャッシュ
+│  │  ├─ ai_summary.py     # OpenAI（口コミ要約）
 │  │  ├─ places.py         # Google Places API 呼び出し
 │  │  ├─ llm.py            # OpenAI連携（生成・抽出）
 │  │  └─ profile.py        # DB操作（user_profiles）
