@@ -2,13 +2,20 @@ from openai import OpenAI
 
 client = OpenAI()  # OPENAI_API_KEY を環境変数から読む
 
-async def summarize_reviews_30(reviews: list[str]) -> str | None:
-    texts = [t.strip() for t in (reviews or []) if t and t.strip()]
+async def summarize_reviews_30(reviews: list[dict]) -> str | None:
+    texts = [
+        r["text"].strip()
+        for r in reviews
+        if (r.get("rating") or 0) >= 4 and r.get("text")
+    ][:5]
+
     if not texts:
         return None
 
-    prompt = "次の口コミを日本語で30字程度に要約して。出力は要約文のみ。\n\n" + "\n".join(
-        f"- {t}" for t in texts
+    prompt = (
+        "次の口コミを日本語で30字程度に要約して。"
+        "出力は1文のみで、客観的な文体にする。\n\n"
+        + "\n".join(f"- {t}" for t in texts)
     )
 
     resp = client.responses.create(
