@@ -4,6 +4,7 @@ import logging
 from app.services.places import search_nearby, nearby_result_to_items, get_place_reviews
 from app.services.ai_summary import summarize_reviews_30
 from app.services.line_client import line_push
+from app.services.ranking import sort_items
 from app.line.messages import build_flex_carousel
 
 from app.services.places_cache import get_cached, set_cached
@@ -15,7 +16,6 @@ WAITING_NONE = "none"
 WAITING_LOCATION = "waiting_location"
 
 user_states: dict[str, str] = {}
-
 
 @router.post("/line/webhook")
 async def line_webhook(request: Request):
@@ -104,6 +104,7 @@ async def line_webhook(request: Request):
                 return {"ok": True}
 
         items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
+        items = sort_items(items)
 
         if not items:
             await line_push(
@@ -116,7 +117,10 @@ async def line_webhook(request: Request):
         # =========================
         # ③ AI 口コミ要約（先頭3件だけ）
         # =========================
-        for item in items[:3]:
+       
+        top3 = items[:3]
+
+        for item in top3:
             try:
                 place_id = item.get("place_id")
                 logger.info("AI summary start place_id=%s", place_id)
