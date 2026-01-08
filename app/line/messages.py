@@ -26,6 +26,7 @@ def _photo_url(photo_reference: str | None, maxwidth: int = 600) -> str:
 
 
 def shop_to_bubble(item: dict) -> dict:
+    place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
     label_text, label_bg = _open_label(item.get("open_now"))
 
     vicinity = item.get("vicinity") or ""
@@ -113,7 +114,6 @@ def shop_to_bubble(item: dict) -> dict:
                 "wrap": True,
             }
         )
-
     return {
         "type": "bubble",
         "hero": {
@@ -122,6 +122,10 @@ def shop_to_bubble(item: dict) -> dict:
             "size": "full",
             "aspectRatio": "16:9",  # ← 縦長すぎ対策
             "aspectMode": "cover",
+            "action": {
+                "type": "uri",
+                "uri": place_url,
+            }
         },
         "body": {
             "type": "box",
@@ -140,7 +144,7 @@ def shop_to_bubble(item: dict) -> dict:
                     "action": {
                         "type": "uri",
                         "label": "地図アプリを開く ",
-                        "uri": map_url,
+                        "uri": map_url,                
                     },
                 }
             ],
