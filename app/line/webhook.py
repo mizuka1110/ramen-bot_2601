@@ -82,36 +82,43 @@ async def line_webhook(request: Request):
         lng = message["longitude"]
 
         q = "ラーメン"
-        radius = 1000
+        items = []
+        had_error = False
 
-        cached = get_cached(lat, lng, q, radius)
+        for radius in (1000, 2000, 3000):
+            cached = get_cached(lat, lng, q, radius)
 
-        try:
-            if cached:
-                result = cached
-            else:
-                result = await search_nearby(lat=lat, lng=lng, q=q, radius=radius)
-                set_cached(lat, lng, q, radius, result)
-        except Exception:
-            if cached:
-                result = cached
-            else:
+            try:
+                if cached:
+                    result = cached
+                else:
+                    result = await search_nearby(lat=lat, lng=lng, q=q, radius=radius)
+                    set_cached(lat, lng, q, radius, result)
+            except Exception:
+                had_error = True
+                if cached:
+                    result = cached
+                else:
+                    continue
+
+            items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
+            if items:
+                break
+
+        if not items:
+            if had_error:
                 await line_push(
                     user_id,
                     [{"type": "text", "text": "今ちょっと検索できないみたい🙏"}],
                 )
-                user_states[user_id] = WAITING_NONE
-                return {"ok": True}
-
-        items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
-
-        if not items:
-            await line_push(
-                user_id,
-                [{"type": "text", "text": "近くにラーメン屋が見つからなかったよ…🍜"}],
-            )
+            else:
+                await line_push(
+                    user_id,
+                    [{"type": "text", "text": "近くにラーメン屋が見つからなかったよ…🍜"}],
+                )
             user_states[user_id] = WAITING_NONE
             return {"ok": True}
+
 
         # =========================
         # ③ AI 口コミ要約（先頭3件だけ）
