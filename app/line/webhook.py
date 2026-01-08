@@ -4,8 +4,8 @@ import logging
 from app.services.places import search_nearby, nearby_result_to_items, get_place_reviews
 from app.services.ai_summary import summarize_reviews_30
 from app.services.line_client import line_push
+from app.services.ranking import sort_items
 from app.line.messages import build_flex_carousel
-
 from app.services.places_cache import get_cached, set_cached
 
 router = APIRouter()
@@ -85,6 +85,7 @@ async def line_webhook(request: Request):
         items = []
         had_error = False
 
+        # 🔁 半径を広げながら検索
         for radius in (1000, 2000, 3000):
             cached = get_cached(lat, lng, q, radius)
 
@@ -101,10 +102,15 @@ async def line_webhook(request: Request):
                 else:
                     continue
 
-            items = nearby_result_to_items(result, user_lat=lat, user_lng=lng, limit=10)
+            items = nearby_result_to_items(
+                result, user_lat=lat, user_lng=lng, limit=10
+            )
+            items = sort_items(items)
+
             if items:
                 break
 
+        # ❗ ループを全部試した「あと」で判定
         if not items:
             if had_error:
                 await line_push(
@@ -114,33 +120,37 @@ async def line_webhook(request: Request):
             else:
                 await line_push(
                     user_id,
-                    [{"type": "text", "text": "近くにラーメン屋が見つからなかったよ…🍜"}],
+                    [
+                        {
+                            "type": "text",
+                            "text": "近くにラーメン屋が見つからなかったよ…🍜",
+                        }
+                    ],
                 )
+
             user_states[user_id] = WAITING_NONE
             return {"ok": True}
 
+        # =========================
+        # ③ AI 口コミ要約（先頭3件）
+        # =========================
+        top3 = items[:3]
 
-        # =========================
-        # ③ AI 口コミ要約（先頭3件だけ）
-        # =========================
-        for item in items[:3]:
+        for item in top3:
             try:
                 place_id = item.get("place_id")
-                logger.info("AI summary start place_id=%s", place_id)
-
                 if not place_id:
                     continue
 
                 reviews = await get_place_reviews(place_id)
-                logger.info("reviews_count=%d", len(reviews))
-
                 summary = await summarize_reviews_30(reviews)
                 if summary:
                     item["review_summary"] = summary
 
             except Exception as e:
-                logger.exception("AI summary failed place_id=%s: %s", place_id, e)
-
+                logger.exception(
+                    "AI summary failed place_id=%s: %s", place_id, e
+                )
 
         # =========================
         # ④ カルーセル送信
