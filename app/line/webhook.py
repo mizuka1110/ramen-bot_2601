@@ -1,24 +1,17 @@
 from fastapi import APIRouter, Request
 import logging
 
-from app.services.places import search_nearby, nearby_result_to_items, get_place_reviews
-from app.services.ai_summary import summarize_reviews_30
+from app.line.handlers.location_handler import handle_location_message
+from app.line.handlers.postback_handler import handle_postback
+from app.line.handlers.text_handler import handle_text_message
 from app.services.line_client import line_push
-from app.services.ranking import sort_items
-from app.line.messages import build_flex_carousel
-from app.services.places_cache import get_cached, set_cached
 
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
 
-WAITING_NONE = "none"
-WAITING_LOCATION = "waiting_location"
-
-user_states: dict[str, str] = {}
-
 
 @router.post("/line/webhook")
-async def line_webhook(request: Request):
+async def line_webhook(request: Request) -> dict[str, bool]:
     body = await request.json()
     logger.info("LINE webhook payload received")
 
@@ -27,145 +20,34 @@ async def line_webhook(request: Request):
         return {"ok": True}
 
     event = events[0]
-    user_id = event["source"]["userId"]
-    message = event.get("message", {})
-    state = user_states.get(user_id, WAITING_NONE)
+    source = event.get("source", {})
+    user_id = source.get("userId")
 
-    # =========================
-    # ① テキストイベント
-    # =========================
-    if message.get("type") == "text":
-        text = message.get("text", "")
-
-        if "ラーメン" in text:
-            user_states[user_id] = WAITING_LOCATION
-            await line_push(
-                user_id,
-                [
-                    {
-                        "type": "text",
-                        "text": "🍜 了解！\n下のボタンから現在地を送ってね👇",
-                        "quickReply": {
-                            "items": [
-                                {
-                                    "type": "action",
-                                    "action": {
-                                        "type": "location",
-                                        "label": "現在地を送る 📍",
-                                    },
-                                }
-                            ]
-                        },
-                    }
-                ],
-            )
-            return {"ok": True}
-
-        await line_push(
-            user_id,
-            [{"type": "text", "text": "「近くのラーメン」って送ってみて🍜"}],
-        )
+    if not user_id:
+        logger.warning("userId not found in LINE event")
         return {"ok": True}
 
-    # =========================
-    # ② 位置情報イベント
-    # =========================
-    if message.get("type") == "location":
-        if state != WAITING_LOCATION:
-            await line_push(
-                user_id,
-                [{"type": "text", "text": "先に「近くのラーメン」って送ってね🍜"}],
-            )
+    event_type = event.get("type")
+
+    if event_type == "message":
+        message = event.get("message", {})
+        message_type = message.get("type")
+
+        if message_type == "text":
+            await handle_text_message(user_id=user_id, message=message)
             return {"ok": True}
 
-        lat = message["latitude"]
-        lng = message["longitude"]
-
-        q = "ラーメン"
-        items = []
-        had_error = False
-
-        # 🔁 半径を広げながら検索
-        for radius in (1000, 2000, 3000):
-            cached = get_cached(lat, lng, q, radius)
-
-            try:
-                if cached:
-                    result = cached
-                else:
-                    result = await search_nearby(lat=lat, lng=lng, q=q, radius=radius)
-                    set_cached(lat, lng, q, radius, result)
-            except Exception:
-                had_error = True
-                if cached:
-                    result = cached
-                else:
-                    continue
-
-            items = nearby_result_to_items(
-                result, user_lat=lat, user_lng=lng, limit=10
-            )
-            items = sort_items(items)
-
-            if items:
-                break
-
-        # ❗ ループを全部試した「あと」で判定
-        if not items:
-            if had_error:
-                await line_push(
-                    user_id,
-                    [{"type": "text", "text": "今ちょっと検索できないみたい🙏"}],
-                )
-            else:
-                await line_push(
-                    user_id,
-                    [
-                        {
-                            "type": "text",
-                            "text": "近くにラーメン屋が見つからなかったよ…🍜",
-                        }
-                    ],
-                )
-
-            user_states[user_id] = WAITING_NONE
+        if message_type == "location":
+            await handle_location_message(user_id=user_id, message=message)
             return {"ok": True}
 
-        # =========================
-        # ③ AI 口コミ要約（先頭3件）
-        # =========================
-        top3 = items[:3]
-
-        for item in top3:
-            try:
-                place_id = item.get("place_id")
-                if not place_id:
-                    continue
-
-                reviews = await get_place_reviews(place_id)
-                summary = await summarize_reviews_30(reviews)
-                if summary:
-                    item["review_summary"] = summary
-
-            except Exception as e:
-                logger.exception(
-                    "AI summary failed place_id=%s: %s", place_id, e
-                )
-
-        # =========================
-        # ④ カルーセル送信
-        # =========================
-        flex = build_flex_carousel(items)
-        await line_push(user_id, [flex])
-
-        user_states[user_id] = WAITING_NONE
+    if event_type == "postback":
+        postback = event.get("postback", {})
+        await handle_postback(user_id=user_id, postback=postback)
         return {"ok": True}
 
-    # =========================
-    # ③ 想定外イベント
-    # =========================
     await line_push(
         user_id,
-        [{"type": "text", "text": "「近くのラーメン」って送ってみて🍜"}],
+        [{"type": "text", "text": "「近くのラーメン」か「好みを登録」って送ってみて🍜"}],
     )
     return {"ok": True}
