@@ -2,6 +2,7 @@ import httpx
 import os
 
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
+LINE_LOADING_URL = "https://api.line.me/v2/bot/chat/loading/start"
 
 
 class LinePushError(Exception):
@@ -24,3 +25,26 @@ async def line_push(to_user_id: str, messages: list[dict]) -> None:
 
     if res.status_code >= 400:
         raise LinePushError(f"LINE push failed: {res.status_code} {res.text}")
+
+
+async def line_loading(user_id: str, seconds: int = 20) -> None:
+    """
+    LINEのローディングアニメーションを表示する。
+    seconds: 表示秒数（5〜60、5の倍数）
+    エラーは握り潰す（ローディングが出なくても致命的ではないため）
+    """
+    token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+    if not token:
+        return
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    payload = {"chatId": user_id, "loadingSeconds": seconds}
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(LINE_LOADING_URL, headers=headers, json=payload)
+    except Exception:
+        pass
