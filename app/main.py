@@ -7,29 +7,50 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from app.services.places import search_nearby, PlacesUpstreamError
 from app.config import GOOGLE_PLACES_API_KEY
+from app.services.places import search_nearby, PlacesUpstreamError
+from app.services.line_client import line_push
 from app.line.webhook import router as line_router
 
 from fastapi.responses import FileResponse
 
+
 app = FastAPI()
 logger = logging.getLogger("uvicorn.error")
 
-# 静的ファイルを /static パスで配信するための設定。
+# =========================
+# Static files
+# =========================
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# =========================
+# Routers
+# =========================
 
 app.include_router(line_router)
 
 
-# NOTE:
-# 距離は「厳密な道のり」ではなく、表示用として十分な簡易距離でOK
+# =========================
+# Utility
+# =========================
+
 def flat_distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """
+    表示用の簡易距離計算
+    """
     km_per_deg_lat = 111.32
     km_per_deg_lng = 111.32 * math.cos(math.radians(lat1))
+
     dx = (lng2 - lng1) * km_per_deg_lng
     dy = (lat2 - lat1) * km_per_deg_lat
+
     return math.sqrt(dx * dx + dy * dy)
+
+
+# =========================
+# Shops API
+# =========================
 
 @app.get("/shops/search")
 async def shops_search(
@@ -37,15 +58,15 @@ async def shops_search(
     lng: float = Query(...),
     q: str = Query(..., min_length=1),
     radius: int = Query(1000, ge=1, le=50000),
-):
-    """
-    Nearby Search の結果を、Flex向けに整形して返す（写真は photo_reference だけ返す）
-    """
+) -> dict:
+
     try:
         data = await search_nearby(lat, lng, q, radius)
+
     except PlacesUpstreamError as e:
         logger.error("places config/upstream error: %s", e)
         raise HTTPException(status_code=500, detail="Upstream error")
+
     except Exception:
         logger.exception("places request failed")
         raise HTTPException(status_code=500, detail="Upstream error")
@@ -66,7 +87,9 @@ async def shops_search(
     items: list[dict] = []
 
     for r in results:
+
         loc = (r.get("geometry") or {}).get("location") or {}
+
         shop_lat = loc.get("lat")
         shop_lng = loc.get("lng")
 
@@ -83,6 +106,7 @@ async def shops_search(
         open_now = opening_hours.get("open_now")
 
         place_id = r.get("place_id")
+
         if not place_id:
             continue
 
@@ -101,7 +125,7 @@ async def shops_search(
                 "rating": r.get("rating"),
                 "rating_count": r.get("user_ratings_total"),
                 "open_now": open_now,
-                "photo_reference": photo_ref,  # ← ここが写真のID
+                "photo_reference": photo_ref,
                 "maps_url": maps_url,
             }
         )
@@ -109,31 +133,42 @@ async def shops_search(
     return {"items": items, "count": len(items)}
 
 
+# =========================
+# Photo Proxy
+# =========================
+
 @app.get("/shops/photo")
 async def shops_photo(
-    ref: str = Query(...), maxwidth: int = Query(600, ge=64, le=1600)
+    ref: str = Query(...),
+    maxwidth: int = Query(600, ge=64, le=1600),
 ):
-    """
-    Google Photo API を代理で叩いて、画像バイナリを返す
-    (Flexの hero.url から参照する)
-    """
+
     if not GOOGLE_PLACES_API_KEY:
-        raise HTTPException(status_code=500, detail="GOOGLE_PLACES_API_KEY is empty")
+        raise HTTPException(
+            status_code=500,
+            detail="GOOGLE_PLACES_API_KEY is empty",
+        )
 
     url = "https://maps.googleapis.com/maps/api/place/photo"
+
     params = {
         "photo_reference": ref,
         "maxwidth": maxwidth,
         "key": GOOGLE_PLACES_API_KEY,
     }
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=10,
+    ) as client:
+
         r = await client.get(url, params=params)
 
     if r.status_code != 200 or not r.content:
         raise HTTPException(status_code=404, detail="Photo not found")
 
     headers = {"Cache-Control": "public, max-age=86400"}
+
     return Response(
         content=r.content,
         media_type=r.headers.get("content-type", "image/jpeg"),
@@ -179,3 +214,53 @@ async def preferences_page():
     #     raise HTTPException(status_code=500, detail=str(e))
 
 
+# =========================
+# Debug API
+# =========================
+
+@app.post("/debug/push")
+async def debug_push(lat: float, lng: float):
+
+    try:
+
+        user_id = os.getenv("LINE_USER_ID")
+
+        if not user_id:
+            raise ValueError("LINE_USER_ID is empty")
+
+        result = await shops_search(
+            lat=lat,
+            lng=lng,
+            q="ラーメン",
+            radius=1000,
+        )
+
+        items = result.get("items") if isinstance(result, dict) else []
+
+        if not items:
+
+            await line_push(
+                user_id,
+                [
+                    {
+                        "type": "text",
+                        "text": "近くにラーメン屋が見つからなかったよ…🍜",
+                    }
+                ],
+            )
+
+            return {"ok": True, "count": 0}
+
+        logger.info("PUBLIC_BASE_URL=%s", os.getenv("PUBLIC_BASE_URL"))
+
+        flex = build_flex_carousel(items)
+
+        await line_push(user_id, [flex])
+
+        return {"ok": True, "count": len(items)}
+
+    except Exception as e:
+
+        logger.exception("debug_push failed")
+
+        raise HTTPException(status_code=500, detail=str(e))

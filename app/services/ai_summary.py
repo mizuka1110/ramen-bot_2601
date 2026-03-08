@@ -13,8 +13,9 @@ async def summarize_reviews_30(reviews: list[dict]) -> str | None:
         return None
 
     prompt = (
-        "次の口コミを日本語で30字程度に要約して。"
-        "出力は1文のみで、客観的な文体にする。\n\n"
+        "次の口コミを日本語で1文のみ、25字で要約して。"
+        "主に味に関するポジティブな内容を使って"
+        "客観的な文体にし、ですますは使わない\n\n"
         + "\n".join(f"- {t}" for t in texts)
     )
 
