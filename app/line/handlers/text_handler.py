@@ -1,7 +1,6 @@
-from app.line.messages import build_preference_menu_flex
+from app.config import PUBLIC_BASE_URL
 from app.line.state import WAITING_LOCATION, set_user_state
 from app.services.line_client import line_push
-from app.services.preference_service import get_preference_weights
 
 
 async def handle_text_message(
@@ -11,8 +10,57 @@ async def handle_text_message(
     text = str(message.get("text", "")).strip()
 
     if "好み" in text:
-        weights = get_preference_weights(user_id)
-        await line_push(user_id, [build_preference_menu_flex(weights)])
+        preferences_url = f"{PUBLIC_BASE_URL.rstrip('/')}/preferences"
+
+        await line_push(
+            user_id,
+            [
+                {
+                    "type": "flex",
+                    "altText": "好みを登録",
+                    "contents": {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ラーメンの好みを登録",
+                                    "weight": "bold",
+                                    "size": "lg",
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "好みを登録すると、検索結果に反映されます。",
+                                    "wrap": True,
+                                    "size": "sm",
+                                    "color": "#666666",
+                                },
+                            ],
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "sm",
+                            "contents": [
+                                {
+                                    "type": "button",
+                                    "style": "primary",
+                                    "color": "#ff8c3a",
+                                    "action": {
+                                        "type": "uri",
+                                        "label": "好みを登録する",
+                                        "uri": preferences_url,
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                }
+            ],
+        )
         return
 
     if "ラーメン" in text:

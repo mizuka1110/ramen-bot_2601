@@ -8,10 +8,12 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import GOOGLE_PLACES_API_KEY
-from app.services.places import search_nearby, PlacesUpstreamError
+from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 from app.services.line_client import line_push
 from app.line.webhook import router as line_router
-from app.line.messages import build_flex_carousel
+from app.schemas import PreferencesRequest
+
+from fastapi.responses import FileResponse
 
 
 app = FastAPI()
@@ -173,6 +175,26 @@ async def shops_photo(
         media_type=r.headers.get("content-type", "image/jpeg"),
         headers=headers,
     )
+from fastapi import Request
+
+##LIFF
+
+@app.get("/preferences")
+async def preferences_page():
+    return FileResponse("app/static/preferences.html")
+
+##好み登録API
+
+@app.post("/api/preferences")
+async def save_preferences(req: PreferencesRequest):
+    upsert_user_weights(req.user_id, req.weights)
+    return {"ok": True}
+
+
+@app.get("/api/preferences")
+async def get_preferences(user_id: str):
+    weights = get_user_weights(user_id)
+    return {"weights": weights or {}}
 
 
 # =========================
