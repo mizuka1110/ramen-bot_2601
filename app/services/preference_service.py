@@ -1,6 +1,5 @@
 from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 
-
 PREFERENCE_CATEGORIES = {
     "あっさり": "あっさり",
     "こってり": "こってり",

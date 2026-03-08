@@ -8,9 +8,10 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import GOOGLE_PLACES_API_KEY
-from app.services.places import search_nearby, PlacesUpstreamError
+from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 from app.services.line_client import line_push
 from app.line.webhook import router as line_router
+from app.schemas import PreferencesRequest
 
 from fastapi.responses import FileResponse
 
@@ -182,36 +183,18 @@ from fastapi import Request
 async def preferences_page():
     return FileResponse("app/static/preferences.html")
 
-##デバッグ用
+##好み登録API
 
-# @app.post("/debug/push")
-# async def debug_push(lat: float, lng: float):
-#     try:
-#         user_id = os.getenv("LINE_USER_ID")
-#         if not user_id:
-#             raise ValueError("LINE_USER_ID is empty")
+@app.post("/api/preferences")
+async def save_preferences(req: PreferencesRequest):
+    upsert_user_weights(req.user_id, req.weights)
+    return {"ok": True}
 
-#         result = await shops_search(lat=lat, lng=lng, q="ラーメン", radius=1000)
-#         items = result.get("items") if isinstance(result, dict) else []
 
-#         if not items:
-#             await line_push(
-#                 user_id,
-#                 [{"type": "text", "text": "近くにラーメン屋が見つからなかったよ…🍜"}],
-#             )
-#             return {"ok": True, "count": 0}
-
-#         logger.info("PUBLIC_BASE_URL=%s", os.getenv("PUBLIC_BASE_URL"))
-
-#         flex = build_flex_carousel(items)
-#         await line_push(user_id, [flex])
-
-#         return {"ok": True, "count": len(items)}
-       
-
-    # except Exception as e:
-    #     logger.exception("debug_push failed")
-    #     raise HTTPException(status_code=500, detail=str(e))
+@app.get("/api/preferences")
+async def get_preferences(user_id: str):
+    weights = get_user_weights(user_id)
+    return {"weights": weights or {}}
 
 
 # =========================

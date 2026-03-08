@@ -1,47 +1,46 @@
-from datetime import datetime, timezone
-
-from psycopg.types.json import Jsonb
-
 from app.db.db import get_conn
+from psycopg.types.json import Json
 
 
-def get_user_weights(line_user_id: str) -> dict[str, float]:
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT weights
-                FROM user_preferences
-                WHERE line_user_id = %s
-                """,
-                (line_user_id,),
-            )
-            row = cur.fetchone()
+def get_user_weights(line_user_id: str) -> dict:
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT weights
+        FROM user_preferences
+        WHERE line_user_id = %s
+        """,
+        (line_user_id,),
+    )
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
 
     if not row:
         return {}
 
-    weights = row[0]
-    if isinstance(weights, dict):
-        return {str(k): float(v) for k, v in weights.items()}
-
-    return {}
+    return row[0] or {}
 
 
-def upsert_user_weights(line_user_id: str, weights: dict[str, float]) -> None:
-    now = datetime.now(timezone.utc)
+def upsert_user_weights(line_user_id: str, weights: dict) -> None:
+    conn = get_conn()
+    cur = conn.cursor()
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO user_preferences (line_user_id, weights, updated_at)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (line_user_id)
-                DO UPDATE SET
-                    weights = EXCLUDED.weights,
-                    updated_at = EXCLUDED.updated_at
-                """,
-                (line_user_id, Jsonb(weights), now),
-            )
-        conn.commit()
+    cur.execute(
+        """
+        INSERT INTO user_preferences (line_user_id, weights)
+        VALUES (%s, %s)
+        ON CONFLICT (line_user_id)
+        DO UPDATE SET
+            weights = EXCLUDED.weights,
+            updated_at = NOW()
+        """,
+        (line_user_id, Json(weights)),
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
