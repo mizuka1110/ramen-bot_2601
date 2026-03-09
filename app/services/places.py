@@ -57,13 +57,13 @@ async def fetch_photo(photo_reference: str, maxwidth: int = 600) -> httpx.Respon
 # ==================================================
 # ③ 店舗詳細（Place Details / 口コミ取得）
 # ==================================================
-async def get_place_reviews(place_id: str) -> list[dict]:
+async def get_place_reviews(place_id: str) -> dict:
     if not GOOGLE_PLACES_API_KEY:
         raise PlacesUpstreamError("CONFIG_ERROR", "PLACES_API_KEY is missing")
 
     params = {
         "place_id": place_id,
-        "fields": "reviews",
+        "fields": "reviews,editorial_summary",
         "language": "ja",
         "key": GOOGLE_PLACES_API_KEY,
     }
@@ -73,15 +73,22 @@ async def get_place_reviews(place_id: str) -> list[dict]:
         r.raise_for_status()
         data = r.json()
 
-    reviews = data.get("result", {}).get("reviews", []) or []
-    return [
-        {
-            "text": rev.get("text"),
-            "rating": rev.get("rating"),
-        }
-        for rev in reviews
-        if rev.get("text")
-    ]
+    result = data.get("result", {}) or {}
+
+    reviews = result.get("reviews", []) or []
+    editorial_summary = (result.get("editorial_summary") or {}).get("overview")
+
+    return {
+        "reviews": [
+            {
+                "text": rev.get("text"),
+                "rating": rev.get("rating"),
+            }
+            for rev in reviews
+            if rev.get("text")
+        ],
+        "editorial_summary": editorial_summary,
+    }
 
 
 def _flat_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:

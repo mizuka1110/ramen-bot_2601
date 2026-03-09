@@ -2,7 +2,7 @@ from app.line.messages import (
     build_preference_choice_flex,
     build_preference_menu_flex,
 )
-from app.services.line_client import line_push
+from app.services.line_client import line_reply
 from app.services.preference_service import (
     PREFERENCE_CATEGORIES,
     get_preference_choice_label,
@@ -13,35 +13,42 @@ from app.services.preference_service import (
 
 async def handle_postback(
     user_id: str,
+    reply_token: str | None,
     postback: dict[str, object],
 ) -> None:
+    if not reply_token:
+        return
+
     data = str(postback.get("data", ""))
 
     if data == "pref:menu":
         weights = get_preference_weights(user_id)
-        await line_push(user_id, [build_preference_menu_flex(weights)])
+        await line_reply(reply_token, [build_preference_menu_flex(weights)])
         return
 
     if data.startswith("pref:category:"):
         category = data.replace("pref:category:", "", 1)
 
         if category not in PREFERENCE_CATEGORIES:
-            await line_push(
-                user_id,
+            await line_reply(
+                reply_token,
                 [{"type": "text", "text": "カテゴリをうまく読み取れなかったよ🙏"}],
             )
             return
 
         weights = get_preference_weights(user_id)
         current_value = weights.get(category, 0)
-        await line_push(user_id, [build_preference_choice_flex(category, current_value)])
+        await line_reply(
+            reply_token,
+            [build_preference_choice_flex(category, current_value)],
+        )
         return
 
     if data.startswith("pref:set:"):
         parts = data.split(":", 3)
         if len(parts) != 4:
-            await line_push(
-                user_id,
+            await line_reply(
+                reply_token,
                 [{"type": "text", "text": "登録処理をうまく読み取れなかったよ🙏"}],
             )
             return
@@ -51,16 +58,16 @@ async def handle_postback(
         try:
             weights = set_preference(user_id, category, choice)
         except ValueError:
-            await line_push(
-                user_id,
+            await line_reply(
+                reply_token,
                 [{"type": "text", "text": "登録内容をうまく読み取れなかったよ🙏"}],
             )
             return
 
         choice_label = get_preference_choice_label(choice)
 
-        await line_push(
-            user_id,
+        await line_reply(
+            reply_token,
             [
                 {
                     "type": "text",
@@ -71,7 +78,7 @@ async def handle_postback(
         )
         return
 
-    await line_push(
-        user_id,
+    await line_reply(
+        reply_token,
         [{"type": "text", "text": "操作をうまく読み取れなかったよ🙏"}],
     )

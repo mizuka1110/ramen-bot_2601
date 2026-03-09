@@ -1,6 +1,7 @@
+import asyncio
 import logging
 
-from app.services.ai_summary import summarize_reviews_30
+from app.services.ai_summary import extract_ramen_categories, summarize_reviews_30
 from app.services.places import (
     get_place_reviews,
     nearby_result_to_items,
@@ -40,9 +41,8 @@ async def search_ramen_items(
             result,
             user_lat=lat,
             user_lng=lng,
-            limit=10,
+            limit=15,
         )
-        items = sort_items(items)
 
         if items:
             break
@@ -50,26 +50,61 @@ async def search_ramen_items(
     if not items:
         return [], had_error
 
-    await attach_review_summaries(items[:3])
+    await attach_categories(items)
+    items = sort_items(items, weights={})
+    items = items[:10]
+    await attach_review_summaries(items)
     return items, had_error
 
 
+async def _attach_category(item: dict[str, object]) -> None:
+    try:
+        place_id_value = item.get("place_id")
+        if not isinstance(place_id_value, str) or not place_id_value:
+            return
+
+        detail = await get_place_reviews(place_id_value)
+        reviews = detail.get("reviews") or []
+        editorial_summary = detail.get("editorial_summary")
+
+        categories = await extract_ramen_categories(editorial_summary, reviews)
+
+        if categories:
+            item["categories"] = categories
+
+    except Exception as e:
+        logger.exception(
+            "attach_categories failed place_id=%s: %s",
+            item.get("place_id"),
+            e,
+        )
+
+
+async def attach_categories(items: list[dict[str, object]]) -> None:
+    await asyncio.gather(*[_attach_category(item) for item in items])
+
+
+async def _attach_review_summary(item: dict[str, object]) -> None:
+    try:
+        place_id_value = item.get("place_id")
+        if not isinstance(place_id_value, str) or not place_id_value:
+            return
+
+        detail = await get_place_reviews(place_id_value)
+        reviews = detail.get("reviews") or []
+
+        summary = await summarize_reviews_30(reviews)
+
+        if summary:
+            item["review_summary"] = summary
+
+    except Exception as e:
+        logger.exception(
+            "attach_review_summaries failed place_id=%s: %s",
+            item.get("place_id"),
+            e,
+        )
+
+
 async def attach_review_summaries(items: list[dict[str, object]]) -> None:
-    for item in items:
-        try:
-            place_id_value = item.get("place_id")
-            if not isinstance(place_id_value, str) or not place_id_value:
-                continue
-
-            reviews = await get_place_reviews(place_id_value)
-            summary = await summarize_reviews_30(reviews)
-
-            if summary:
-                item["review_summary"] = summary
-
-        except Exception as e:
-            logger.exception(
-                "AI summary failed place_id=%s: %s",
-                item.get("place_id"),
-                e,
-            )
+    await asyncio.gather(*[_attach_review_summary(item) for item in items])
