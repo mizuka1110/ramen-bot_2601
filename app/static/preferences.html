@@ -160,8 +160,12 @@
       }
 
       @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
       }
 
       /* オーバーレイ */
@@ -210,8 +214,12 @@
       }
 
       @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
       }
     </style>
   </head>
@@ -221,7 +229,9 @@
       <div id="overlayContent">
         <div id="overlayEmoji">✅</div>
         <div id="overlayTitle">好みを登録しました！</div>
-        <div id="overlayBody">トークに戻ってラーメンを検索してみてください🍜</div>
+        <div id="overlayBody">
+          トークに戻ってラーメンを検索してみてください🍜
+        </div>
       </div>
     </div>
 
@@ -371,7 +381,10 @@
 
           await loadPreferences();
         } catch (error) {
-          console.error(error);
+          document.body.insertAdjacentHTML(
+            "afterbegin",
+            `<div style="background:red;color:white;padding:10px;word-break:break-all">${error}</div>`,
+          );
         }
       }
 
@@ -436,9 +449,13 @@
           const value = weightToValue(category, weight);
           if (!value) return;
 
-          segment.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+          segment
+            .querySelectorAll("button")
+            .forEach((b) => b.classList.remove("active"));
 
-          const targetButton = segment.querySelector(`button[data-value="${value}"]`);
+          const targetButton = segment.querySelector(
+            `button[data-value="${value}"]`,
+          );
           if (targetButton) targetButton.classList.add("active");
         });
       }
@@ -470,7 +487,6 @@
               liff.closeWindow();
             }
           }, 1500);
-
         } catch (error) {
           console.error(error);
           saveBtn.innerText = "保存する";
@@ -478,7 +494,9 @@
         }
       }
 
-      document.getElementById("saveBtn").addEventListener("click", savePreferences);
+      document
+        .getElementById("saveBtn")
+        .addEventListener("click", savePreferences);
 
       document.getElementById("closeBtn").addEventListener("click", () => {
         if (liff.isInClient()) {

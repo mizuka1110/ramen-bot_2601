@@ -219,69 +219,11 @@ def build_preference_choice_flex(category: str, current_value: float = 0) -> dic
                 "type": "box",
                 "layout": "vertical",
                 "spacing": "md",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": label,
-                        "weight": "bold",
-                        "size": "xl",
-                        "color": "#111827",
                     },
-                    {
-                        "type": "text",
-                        "text": "どれに近い？",
-                        "size": "sm",
-                        "color": "#6B7280",
-                    },
-                    _build_preference_status_chip(current_value),
-                ],
-            },
             "footer": {
                 "type": "box",
                 "layout": "vertical",
                 "spacing": "sm",
-                "contents": [
-                    {
-                        "type": "button",
-                        "style": "secondary",
-                        "action": {
-                            "type": "postback",
-                            "label": "好き",
-                            "data": f"pref:set:{category}:like",
-                            "displayText": f"{label}は好き",
-                        },
-                    },
-                    {
-                        "type": "button",
-                        "style": "secondary",
-                        "action": {
-                            "type": "postback",
-                            "label": "めちゃ好き",
-                            "data": f"pref:set:{category}:love",
-                            "displayText": f"{label}はめちゃ好き",
-                        },
-                    },
-                    {
-                        "type": "button",
-                        "style": "secondary",
-                        "action": {
-                            "type": "postback",
-                            "label": "苦手",
-                            "data": f"pref:set:{category}:dislike",
-                            "displayText": f"{label}は苦手",
-                        },
-                    },
-                    {
-                        "type": "button",
-                        "style": "link",
-                        "action": {
-                            "type": "postback",
-                            "label": "一覧に戻る",
-                            "data": "pref:menu",
-                            "displayText": "好み登録の一覧に戻る",
-                        },
-                    },
-                ],
             },
         },
     }

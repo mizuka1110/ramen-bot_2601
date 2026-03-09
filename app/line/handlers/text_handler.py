@@ -1,19 +1,23 @@
 from app.config import PUBLIC_BASE_URL
 from app.line.state import WAITING_LOCATION, set_user_state
-from app.services.line_client import line_push
+from app.services.line_client import line_reply
 
 
 async def handle_text_message(
     user_id: str,
+    reply_token: str | None,
     message: dict[str, object],
 ) -> None:
+    if not reply_token:
+        return
+
     text = str(message.get("text", "")).strip()
 
     if "好み" in text:
         preferences_url = f"{PUBLIC_BASE_URL.rstrip('/')}/preferences"
 
-        await line_push(
-            user_id,
+        await line_reply(
+            reply_token,
             [
                 {
                     "type": "flex",
@@ -48,6 +52,7 @@ async def handle_text_message(
                                 {
                                     "type": "button",
                                     "style": "primary",
+                                    "height": "sm",
                                     "color": "#ff8c3a",
                                     "action": {
                                         "type": "uri",
@@ -65,8 +70,8 @@ async def handle_text_message(
 
     if "ラーメン" in text:
         set_user_state(user_id, WAITING_LOCATION)
-        await line_push(
-            user_id,
+        await line_reply(
+            reply_token,
             [
                 {
                     "type": "text",
@@ -87,8 +92,8 @@ async def handle_text_message(
         )
         return
 
-    await line_push(
-        user_id,
+    await line_reply(
+        reply_token,
         [
             {
                 "type": "text",

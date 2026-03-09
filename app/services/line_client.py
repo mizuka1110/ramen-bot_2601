@@ -2,6 +2,7 @@ import httpx
 import os
 
 LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
+LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 LINE_LOADING_URL = "https://api.line.me/v2/bot/chat/loading/start"
 
 
@@ -25,6 +26,27 @@ async def line_push(to_user_id: str, messages: list[dict]) -> None:
 
     if res.status_code >= 400:
         raise LinePushError(f"LINE push failed: {res.status_code} {res.text}")
+
+
+async def line_reply(reply_token: str, messages: list[dict]) -> None:
+    token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+    if not token:
+        raise LinePushError("LINE_CHANNEL_ACCESS_TOKEN is empty")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "replyToken": reply_token,
+        "messages": messages,
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.post(LINE_REPLY_URL, headers=headers, json=payload)
+
+    if res.status_code >= 400:
+        raise LinePushError(f"LINE reply failed: {res.status_code} {res.text}")
 
 
 async def line_loading(user_id: str, seconds: int = 20) -> None:
