@@ -503,7 +503,11 @@
           liff.closeWindow();
           return;
         }
-        window.close();
+        if (window.liff) {
+          liff.closeWindow()
+        } else {
+          window.close()
+        }
         setTimeout(() => {
           // フォールバック（開発環境など）
         }, 300);
