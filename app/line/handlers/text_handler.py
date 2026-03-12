@@ -14,7 +14,7 @@ async def handle_text_message(
     text = str(message.get("text", "")).strip()
 
     if "好み" in text:
-        preferences_url = f"{PUBLIC_BASE_URL.rstrip('/')}/preferences"
+        preferences_url = "https://liff.line.me/2009360861-I31kIVzt"
 
         await line_reply(
             reply_token,
