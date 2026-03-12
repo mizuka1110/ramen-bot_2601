@@ -66,3 +66,13 @@ async def line_webhook(request: Request) -> dict[str, bool]:
         )
 
     return {"ok": True}
+
+# LINEwebhook確認用
+
+@router.get("/line/webhook")
+async def webhook_health():
+        return {"status": "ok"}
+
+@router.post("/line/webhook")
+async def line_webhook(request: Request):
+    ...
