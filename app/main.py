@@ -247,3 +247,10 @@ async def debug_push(lat: float, lng: float):
         logger.exception("debug_push failed")
 
         raise HTTPException(status_code=500, detail=str(e))
+
+# =========================
+# Render確認要
+# =========================
+@app.get("/")
+async def root() -> dict[str, bool]:
+    return {"ok": True}
