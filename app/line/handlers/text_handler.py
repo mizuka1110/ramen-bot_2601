@@ -48,6 +48,7 @@ async def handle_text_message(
                             "type": "box",
                             "layout": "vertical",
                             "spacing": "sm",
+                            "alignItems": "center",
                             "contents": [
                                 {
                                     "type": "button",
@@ -61,7 +62,7 @@ async def handle_text_message(
                                     },
                                 }
                             ],
-                        },
+                        }
                     },
                 }
             ],
