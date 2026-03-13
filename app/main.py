@@ -254,3 +254,7 @@ async def debug_push(lat: float, lng: float):
 @app.get("/")
 async def root() -> dict[str, bool]:
     return {"ok": True}
+
+@app.get("/")
+async def root():
+    return {"status": "ok"}
