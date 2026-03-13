@@ -249,12 +249,8 @@ async def debug_push(lat: float, lng: float):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =========================
-# Render確認要
+# Render スリープ & ヘルスチェック対策
 # =========================
-@app.get("/")
-async def root() -> dict[str, bool]:
-    return {"ok": True}
-
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"status": "ok"}
