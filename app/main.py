@@ -251,6 +251,6 @@ async def debug_push(lat: float, lng: float):
 # =========================
 # Render スリープ & ヘルスチェック対策
 # =========================
-@app.api_route("/", methods=["GET", "HEAD"])
-async def root():
+@app.get("/health")
+async def health():
     return {"status": "ok"}
