@@ -18,6 +18,21 @@ _PER_ITEM_TIMEOUT_SEC = 8.0
 _ENRICH_TOTAL_TIMEOUT_SEC = 12.0
 
 
+def _get_user_weights_or_empty(line_user_id: str | None) -> dict[str, float]:
+    if not line_user_id:
+        return {}
+
+    try:
+        return get_user_weights(line_user_id)
+    except Exception as e:
+        logger.warning(
+            "get_user_weights failed for line_user_id=%s, fallback to empty weights: %s",
+            line_user_id,
+            e,
+        )
+        return {}
+
+
 async def search_ramen_items(
     lat: float,
     lng: float,
@@ -56,7 +71,7 @@ async def search_ramen_items(
     if not items:
         return [], had_error
 
-    weights = get_user_weights(line_user_id) if line_user_id else {}
+    weights = _get_user_weights_or_empty(line_user_id)
     items = sort_items(items, weights=weights)
     items = items[:10]
 
