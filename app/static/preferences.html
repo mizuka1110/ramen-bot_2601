@@ -440,6 +440,12 @@
         return result;
       }
 
+      function normalizeWeights(weights) {
+        return Object.fromEntries(
+          Object.entries(weights || {}).sort(([a], [b]) => a.localeCompare(b)),
+        );
+      }
+
       async function loadPreferences() {
         if (!userId) return;
 
@@ -484,7 +490,12 @@
         const saveBtn = document.getElementById("saveBtn");
         const weights = collectWeights();
 
-        if (!userId) return;
+        if (!userId) {
+          alert(
+            "ユーザー情報が取得できていないため保存できません。LINEアプリ内で開き直してください。",
+          );
+          return;
+        }
 
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<span class="spinner"></span>保存中';
@@ -496,7 +507,25 @@
             body: JSON.stringify({ user_id: userId, weights }),
           });
 
-          if (!response.ok) throw new Error("save failed");
+          if (!response.ok) {
+            const message = await response.text();
+            throw new Error(`save failed: ${response.status} ${message}`);
+          }
+
+          const verifyResponse = await fetch(
+            `/api/preferences?user_id=${encodeURIComponent(userId)}`,
+          );
+          if (!verifyResponse.ok) {
+            throw new Error(`verify failed: ${verifyResponse.status}`);
+          }
+          const verifyData = await verifyResponse.json();
+          const expected = JSON.stringify(normalizeWeights(weights));
+          const actual = JSON.stringify(normalizeWeights(verifyData.weights));
+          if (expected !== actual) {
+            throw new Error(
+              `save verification mismatch: expected=${expected} actual=${actual}`,
+            );
+          }
 
           // オーバーレイ表示
           document.getElementById("overlay").classList.add("show");
@@ -508,7 +537,10 @@
             }
           }, 1500);
         } catch (error) {
-          console.error(error);
+          console.error("preference save error", error);
+          alert(
+            `保存に失敗しました。通信状況をご確認の上、再度お試しください。\n${error.message || error}`,
+          );
           saveBtn.innerText = "保存する";
           saveBtn.disabled = false;
         }
