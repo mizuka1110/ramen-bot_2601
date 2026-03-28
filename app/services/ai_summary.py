@@ -55,7 +55,7 @@ async def extract_ramen_categories(
 
     prompt = (
         "次のラーメン店の説明文・口コミから、該当するカテゴリのみを選んでください。\n"
-        "候補: あっさり, こってり, 魚介, 煮干し, 鶏白湯, 豚骨, しょうゆ, 味噌, しお, 辛い, 家系, 二郎系\n"
+        "候補: あっさり, こってり, 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系\n"
         "出力は候補の中から該当するものだけを、カンマ区切りで1行で返してください。\n"
         "該当なしなら空文字で返してください。\n\n"
         f"{source_text}"
@@ -77,13 +77,22 @@ async def extract_ramen_categories(
         "煮干し",
         "鶏白湯",
         "豚骨",
-        "しょうゆ",
+        "醤油",
         "味噌",
-        "しお",
+        "塩",
         "辛い",
         "家系",
         "二郎系",
     }
 
-    categories = [c.strip() for c in result.split(",") if c.strip()]
+    aliases = {
+        "しょうゆ": "醤油",
+        "しお": "塩",
+    }
+
+    categories = [
+        aliases.get(c.strip(), c.strip())
+        for c in result.split(",")
+        if c.strip()
+    ]
     return [c for c in categories if c in allowed_categories]
