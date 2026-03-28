@@ -12,6 +12,14 @@ DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "pass")
 
 
+def get_db_connection_source() -> str:
+    if SUPABASE_DB_URL:
+        return "SUPABASE_DB_URL"
+    if DATABASE_URL:
+        return "DATABASE_URL"
+    return f"DB_HOST({DB_HOST}:{DB_PORT}/{DB_NAME})"
+
+
 def get_conn() -> psycopg.Connection:
     if SUPABASE_DB_URL:
         return psycopg.connect(SUPABASE_DB_URL)

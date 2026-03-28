@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import GOOGLE_PLACES_API_KEY
+from app.db.db import get_db_connection_source
 from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 from app.services.line_client import line_push
 from app.line.webhook import router as line_router
@@ -190,8 +191,20 @@ async def preferences_page():
 async def save_preferences(req: PreferencesRequest):
     if not req.user_id.strip():
         raise HTTPException(status_code=400, detail="user_id is empty")
-    upsert_user_weights(req.user_id, req.weights)
-    return {"ok": True, "saved_count": len(req.weights)}
+    try:
+        upsert_user_weights(req.user_id, req.weights)
+    except Exception as e:
+        source = get_db_connection_source()
+        logger.exception("save_preferences failed (db_source=%s)", source)
+        raise HTTPException(
+            status_code=500,
+            detail=f"DB save failed (source={source}). Check DB env vars.",
+        ) from e
+    return {
+        "ok": True,
+        "saved_count": len(req.weights),
+        "db_source": get_db_connection_source(),
+    }
 
 
 @app.get("/api/preferences")

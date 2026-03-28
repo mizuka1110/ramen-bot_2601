@@ -440,6 +440,12 @@
         return result;
       }
 
+      function normalizeWeights(weights) {
+        return Object.fromEntries(
+          Object.entries(weights || {}).sort(([a], [b]) => a.localeCompare(b)),
+        );
+      }
+
       async function loadPreferences() {
         if (!userId) return;
 
@@ -513,11 +519,12 @@
             throw new Error(`verify failed: ${verifyResponse.status}`);
           }
           const verifyData = await verifyResponse.json();
-          const savedWeights = verifyData.weights || {};
-          const expected = JSON.stringify(weights);
-          const actual = JSON.stringify(savedWeights);
+          const expected = JSON.stringify(normalizeWeights(weights));
+          const actual = JSON.stringify(normalizeWeights(verifyData.weights));
           if (expected !== actual) {
-            throw new Error("save verification mismatch");
+            throw new Error(
+              `save verification mismatch: expected=${expected} actual=${actual}`,
+            );
           }
 
           // オーバーレイ表示
@@ -531,7 +538,9 @@
           }, 1500);
         } catch (error) {
           console.error("preference save error", error);
-          alert("保存に失敗しました。通信状況をご確認の上、再度お試しください。");
+          alert(
+            `保存に失敗しました。通信状況をご確認の上、再度お試しください。\n${error.message || error}`,
+          );
           saveBtn.innerText = "保存する";
           saveBtn.disabled = false;
         }
