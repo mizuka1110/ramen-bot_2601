@@ -49,7 +49,11 @@ async def handle_location_message(
 
     await line_loading(user_id)
 
-    items, had_error = await search_ramen_items(lat=lat, lng=lng)
+    items, had_error = await search_ramen_items(
+        lat=lat,
+        lng=lng,
+        line_user_id=user_id,
+    )
 
     if not items:
         if had_error:
@@ -68,7 +72,7 @@ async def handle_location_message(
                 [
                     {
                         "type": "text",
-                        "text": "近くにラーメン屋が見つからなかったよ…🍜",
+                        "text": "3000m以内にラーメン屋さんが見つかりません…🍜",
                     }
                 ],
             )

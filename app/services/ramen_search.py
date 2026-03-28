@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from app.db.user_pref_repo import get_user_weights
 from app.services.ai_summary import extract_ramen_categories, summarize_reviews_30
 from app.services.places import (
     get_place_reviews,
@@ -16,6 +17,7 @@ logger = logging.getLogger("uvicorn.error")
 async def search_ramen_items(
     lat: float,
     lng: float,
+    line_user_id: str | None = None,
 ) -> tuple[list[dict[str, object]], bool]:
     q = "ラーメン"
     had_error = False
@@ -51,7 +53,8 @@ async def search_ramen_items(
         return [], had_error
 
     await attach_categories(items)
-    items = sort_items(items, weights={})
+    weights = get_user_weights(line_user_id) if line_user_id else {}
+    items = sort_items(items, weights=weights)
     items = items[:10]
     await attach_review_summaries(items)
     return items, had_error
