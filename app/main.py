@@ -191,6 +191,11 @@ async def preferences_page():
 async def save_preferences(req: PreferencesRequest):
     if not req.user_id.strip():
         raise HTTPException(status_code=400, detail="user_id is empty")
+    logger.info(
+        "save_preferences requested user_id=%s weights=%d",
+        req.user_id[:8],
+        len(req.weights),
+    )
     try:
         upsert_user_weights(req.user_id, req.weights)
     except Exception as e:
@@ -200,6 +205,7 @@ async def save_preferences(req: PreferencesRequest):
             status_code=500,
             detail=f"DB save failed (source={source}). Check DB env vars.",
         ) from e
+    logger.info("save_preferences succeeded user_id=%s", req.user_id[:8])
     return {
         "ok": True,
         "saved_count": len(req.weights),
