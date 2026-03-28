@@ -4,7 +4,7 @@ import httpx
 import os
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import GOOGLE_PLACES_API_KEY
@@ -178,8 +178,6 @@ async def shops_photo(
         media_type=r.headers.get("content-type", "image/jpeg"),
         headers=headers,
     )
-from fastapi import Request
-
 ##LIFF
 
 @app.get("/preferences")
@@ -255,5 +253,8 @@ async def debug_push(lat: float, lng: float):
 # Render スリープ & ヘルスチェック対策
 # =========================
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health() -> JSONResponse:
+    return JSONResponse(
+        content={"status": "ok"},
+        headers={"Cache-Control": "public, max-age=60"},
+    )
