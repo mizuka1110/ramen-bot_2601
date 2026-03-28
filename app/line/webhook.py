@@ -19,51 +19,51 @@ async def line_webhook(request: Request) -> dict[str, bool]:
     if not events:
         return {"ok": True}
 
-    event = events[0]
-    source = event.get("source", {})
-    user_id = source.get("userId")
-    reply_token = event.get("replyToken")
+    for event in events:
+        source = event.get("source", {})
+        user_id = source.get("userId")
+        reply_token = event.get("replyToken")
 
-    if not user_id:
-        logger.warning("userId not found in LINE event")
-        return {"ok": True}
+        if not user_id:
+            logger.warning("userId not found in LINE event")
+            continue
 
-    event_type = event.get("type")
+        event_type = event.get("type")
 
-    if event_type == "message":
-        message = event.get("message", {})
-        message_type = message.get("type")
+        if event_type == "message":
+            message = event.get("message", {})
+            message_type = message.get("type")
 
-        if message_type == "text":
-            await handle_text_message(
+            if message_type == "text":
+                await handle_text_message(
+                    user_id=user_id,
+                    reply_token=reply_token,
+                    message=message,
+                )
+                continue
+
+            if message_type == "location":
+                await handle_location_message(
+                    user_id=user_id,
+                    reply_token=reply_token,
+                    message=message,
+                )
+                continue
+
+        if event_type == "postback":
+            postback = event.get("postback", {})
+            await handle_postback(
                 user_id=user_id,
                 reply_token=reply_token,
-                message=message,
+                postback=postback,
             )
-            return {"ok": True}
+            continue
 
-        if message_type == "location":
-            await handle_location_message(
-                user_id=user_id,
-                reply_token=reply_token,
-                message=message,
+        if reply_token:
+            await line_reply(
+                reply_token,
+                [{"type": "text", "text": "「近くのラーメン」か「好みを登録」って送ってみて🍜"}],
             )
-            return {"ok": True}
-
-    if event_type == "postback":
-        postback = event.get("postback", {})
-        await handle_postback(
-            user_id=user_id,
-            reply_token=reply_token,
-            postback=postback,
-        )
-        return {"ok": True}
-
-    if reply_token:
-        await line_reply(
-            reply_token,
-            [{"type": "text", "text": "「近くのラーメン」か「好みを登録」って送ってみて🍜"}],
-        )
 
     return {"ok": True}
 
