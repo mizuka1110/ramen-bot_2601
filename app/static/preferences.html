@@ -484,7 +484,12 @@
         const saveBtn = document.getElementById("saveBtn");
         const weights = collectWeights();
 
-        if (!userId) return;
+        if (!userId) {
+          alert(
+            "ユーザー情報が取得できていないため保存できません。LINEアプリ内で開き直してください。",
+          );
+          return;
+        }
 
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<span class="spinner"></span>保存中';
@@ -496,7 +501,24 @@
             body: JSON.stringify({ user_id: userId, weights }),
           });
 
-          if (!response.ok) throw new Error("save failed");
+          if (!response.ok) {
+            const message = await response.text();
+            throw new Error(`save failed: ${response.status} ${message}`);
+          }
+
+          const verifyResponse = await fetch(
+            `/api/preferences?user_id=${encodeURIComponent(userId)}`,
+          );
+          if (!verifyResponse.ok) {
+            throw new Error(`verify failed: ${verifyResponse.status}`);
+          }
+          const verifyData = await verifyResponse.json();
+          const savedWeights = verifyData.weights || {};
+          const expected = JSON.stringify(weights);
+          const actual = JSON.stringify(savedWeights);
+          if (expected !== actual) {
+            throw new Error("save verification mismatch");
+          }
 
           // オーバーレイ表示
           document.getElementById("overlay").classList.add("show");
@@ -508,7 +530,8 @@
             }
           }, 1500);
         } catch (error) {
-          console.error(error);
+          console.error("preference save error", error);
+          alert("保存に失敗しました。通信状況をご確認の上、再度お試しください。");
           saveBtn.innerText = "保存する";
           saveBtn.disabled = false;
         }

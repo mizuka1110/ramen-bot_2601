@@ -188,8 +188,10 @@ async def preferences_page():
 
 @app.post("/api/preferences")
 async def save_preferences(req: PreferencesRequest):
+    if not req.user_id.strip():
+        raise HTTPException(status_code=400, detail="user_id is empty")
     upsert_user_weights(req.user_id, req.weights)
-    return {"ok": True}
+    return {"ok": True, "saved_count": len(req.weights)}
 
 
 @app.get("/api/preferences")
