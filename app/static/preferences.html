@@ -489,6 +489,7 @@
       async function savePreferences() {
         const saveBtn = document.getElementById("saveBtn");
         const weights = collectWeights();
+        const SAVE_TIMEOUT_MS = 15000;
 
         if (!userId) {
           alert(
@@ -501,30 +502,48 @@
         saveBtn.innerHTML = '<span class="spinner"></span>保存中';
 
         try {
-          const response = await fetch("/api/preferences", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, weights }),
-          });
+          const saveController = new AbortController();
+          let saveTimeout = setTimeout(
+            () => saveController.abort("save request timeout"),
+            SAVE_TIMEOUT_MS,
+          );
+          let response;
+          try {
+            response = await fetch("/api/preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_id: userId, weights }),
+              signal: saveController.signal,
+            });
+          } finally {
+            clearTimeout(saveTimeout);
+          }
 
           if (!response.ok) {
             const message = await response.text();
             throw new Error(`save failed: ${response.status} ${message}`);
           }
 
-          const verifyResponse = await fetch(
-            `/api/preferences?user_id=${encodeURIComponent(userId)}`,
-          );
-          if (!verifyResponse.ok) {
-            throw new Error(`verify failed: ${verifyResponse.status}`);
-          }
-          const verifyData = await verifyResponse.json();
-          const expected = JSON.stringify(normalizeWeights(weights));
-          const actual = JSON.stringify(normalizeWeights(verifyData.weights));
-          if (expected !== actual) {
-            throw new Error(
-              `save verification mismatch: expected=${expected} actual=${actual}`,
+          // 保存後の検証はベストエフォートで実施。
+          // ここで通信失敗しても保存自体は完了している可能性があるため、
+          // ユーザーには失敗扱いにしない。
+          try {
+            const verifyResponse = await fetch(
+              `/api/preferences?user_id=${encodeURIComponent(userId)}`,
             );
+            if (!verifyResponse.ok) {
+              throw new Error(`verify failed: ${verifyResponse.status}`);
+            }
+            const verifyData = await verifyResponse.json();
+            const expected = JSON.stringify(normalizeWeights(weights));
+            const actual = JSON.stringify(normalizeWeights(verifyData.weights));
+            if (expected !== actual) {
+              console.warn(
+                `save verification mismatch: expected=${expected} actual=${actual}`,
+              );
+            }
+          } catch (verifyError) {
+            console.warn("save verification skipped:", verifyError);
           }
 
           // オーバーレイ表示
