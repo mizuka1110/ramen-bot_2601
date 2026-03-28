@@ -3,6 +3,19 @@ import math
 from app.config import GOOGLE_PLACES_API_KEY, GOOGLE_NEARBY_URL
 
 GOOGLE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+NON_STORE_KEYWORDS = ("モニュメント", "記念碑", "像", "ミュージアム", "博物館", "ファクトリー", "工場")
+FOOD_PLACE_TYPES = {
+    "restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+}
+EXCLUDE_TYPES = {
+    "tourist_attraction",
+    "museum",
+    "amusement_park",
+    "store",
+    "shopping_mall",
+}
 
 
 class PlacesUpstreamError(Exception):
@@ -99,11 +112,27 @@ def _flat_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
     return int(round(math.sqrt(dx * dx + dy * dy) * 1000))
 
 
+def _is_ramen_shop_candidate(place: dict) -> bool:
+    name = (place.get("name") or "").strip()
+    if any(keyword in name for keyword in NON_STORE_KEYWORDS):
+        return False
+
+    types = set(place.get("types") or [])
+
+    if types.intersection(EXCLUDE_TYPES):
+        return False
+
+    return bool(types.intersection(FOOD_PLACE_TYPES))
+
+
 def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit: int = 10) -> list[dict]:
-    raw_items = (result.get("results") or [])[:limit]
+    raw_items = result.get("results") or []
 
     items: list[dict] = []
     for r in raw_items:
+        if not _is_ramen_shop_candidate(r):
+            continue
+
         loc = (r.get("geometry") or {}).get("location") or {}
         lat = loc.get("lat")
         lng = loc.get("lng")
@@ -120,9 +149,12 @@ def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit
                 "rating": r.get("rating"),
                 "rating_count": r.get("user_ratings_total"),
                 "photo_reference": ((r.get("photos") or [{}])[0].get("photo_reference")),
-                "place_id": r.get("place_id"),  # ← 口コミ取得に必要
+                "place_id": r.get("place_id"),
                 "distance_m": _flat_distance_m(user_lat, user_lng, lat, lng),
             }
         )
+
+        if len(items) >= limit:
+            break
 
     return items
