@@ -313,6 +313,26 @@
       </div>
 
       <div class="row">
+        <div class="label">醤油</div>
+        <div class="segment" data-key="醤油">
+          <button type="button" data-value="love">大好き</button>
+          <button type="button" data-value="like">好き</button>
+          <button type="button" data-value="neutral">普通</button>
+          <button type="button" data-value="dislike">苦手</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">塩</div>
+        <div class="segment" data-key="塩">
+          <button type="button" data-value="love">大好き</button>
+          <button type="button" data-value="like">好き</button>
+          <button type="button" data-value="neutral">普通</button>
+          <button type="button" data-value="dislike">苦手</button>
+        </div>
+      </div>
+
+      <div class="row">
         <div class="label">辛い</div>
         <div class="segment" data-key="辛い">
           <button type="button" data-value="love">大好き</button>
@@ -504,9 +524,9 @@
           return;
         }
         if (window.liff) {
-          liff.closeWindow()
+          liff.closeWindow();
         } else {
-          window.close()
+          window.close();
         }
         setTimeout(() => {
           // フォールバック（開発環境など）
