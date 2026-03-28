@@ -14,7 +14,10 @@ from app.line.webhook import router as line_router
 from app.schemas import PreferencesRequest
 
 from fastapi.responses import FileResponse
+from dotenv import load_dotenv
 
+env = os.getenv("ENV", "development")
+load_dotenv(f".env.{env}")
 
 app = FastAPI()
 logger = logging.getLogger("uvicorn.error")
