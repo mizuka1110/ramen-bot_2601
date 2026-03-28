@@ -13,6 +13,10 @@ from app.services.ranking import sort_items
 
 logger = logging.getLogger("uvicorn.error")
 
+_ENRICH_CONCURRENCY = 4
+_PER_ITEM_TIMEOUT_SEC = 8.0
+_ENRICH_TOTAL_TIMEOUT_SEC = 12.0
+
 
 async def search_ramen_items(
     lat: float,
@@ -52,62 +56,75 @@ async def search_ramen_items(
     if not items:
         return [], had_error
 
-    await attach_categories(items)
     weights = get_user_weights(line_user_id) if line_user_id else {}
     items = sort_items(items, weights=weights)
     items = items[:10]
-    await attach_review_summaries(items)
+
+    await enrich_items(items)
     return items, had_error
 
 
-async def _attach_category(item: dict[str, object]) -> None:
-    try:
-        place_id_value = item.get("place_id")
-        if not isinstance(place_id_value, str) or not place_id_value:
+async def _enrich_item(
+    item: dict[str, object],
+    semaphore: asyncio.Semaphore,
+) -> None:
+    place_id_value = item.get("place_id")
+    if not isinstance(place_id_value, str) or not place_id_value:
+        return
+
+    async with semaphore:
+        try:
+            detail = await asyncio.wait_for(
+                get_place_reviews(place_id_value),
+                timeout=_PER_ITEM_TIMEOUT_SEC,
+            )
+        except Exception as e:
+            logger.warning(
+                "get_place_reviews skipped place_id=%s: %s",
+                place_id_value,
+                e,
+            )
             return
 
-        detail = await get_place_reviews(place_id_value)
-        reviews = detail.get("reviews") or []
-        editorial_summary = detail.get("editorial_summary")
+    reviews = detail.get("reviews") or []
+    editorial_summary = detail.get("editorial_summary")
 
-        categories = await extract_ramen_categories(editorial_summary, reviews)
+    category_task = extract_ramen_categories(editorial_summary, reviews)
+    summary_task = summarize_reviews_30(reviews)
 
-        if categories:
-            item["categories"] = categories
+    categories_result, summary_result = await asyncio.gather(
+        category_task,
+        summary_task,
+        return_exceptions=True,
+    )
 
-    except Exception as e:
-        logger.exception(
-            "attach_categories failed place_id=%s: %s",
-            item.get("place_id"),
-            e,
+    if not isinstance(categories_result, Exception) and categories_result:
+        item["categories"] = categories_result
+    elif isinstance(categories_result, Exception):
+        logger.warning(
+            "extract_ramen_categories skipped place_id=%s: %s",
+            place_id_value,
+            categories_result,
+        )
+
+    if not isinstance(summary_result, Exception) and summary_result:
+        item["review_summary"] = summary_result
+    elif isinstance(summary_result, Exception):
+        logger.warning(
+            "summarize_reviews_30 skipped place_id=%s: %s",
+            place_id_value,
+            summary_result,
         )
 
 
-async def attach_categories(items: list[dict[str, object]]) -> None:
-    await asyncio.gather(*[_attach_category(item) for item in items])
+async def enrich_items(items: list[dict[str, object]]) -> None:
+    semaphore = asyncio.Semaphore(_ENRICH_CONCURRENCY)
+    tasks = [_enrich_item(item, semaphore) for item in items]
 
-
-async def _attach_review_summary(item: dict[str, object]) -> None:
     try:
-        place_id_value = item.get("place_id")
-        if not isinstance(place_id_value, str) or not place_id_value:
-            return
-
-        detail = await get_place_reviews(place_id_value)
-        reviews = detail.get("reviews") or []
-
-        summary = await summarize_reviews_30(reviews)
-
-        if summary:
-            item["review_summary"] = summary
-
-    except Exception as e:
-        logger.exception(
-            "attach_review_summaries failed place_id=%s: %s",
-            item.get("place_id"),
-            e,
+        await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=False),
+            timeout=_ENRICH_TOTAL_TIMEOUT_SEC,
         )
-
-
-async def attach_review_summaries(items: list[dict[str, object]]) -> None:
-    await asyncio.gather(*[_attach_review_summary(item) for item in items])
+    except TimeoutError:
+        logger.warning("enrich_items timeout: returned without full enrichment")
