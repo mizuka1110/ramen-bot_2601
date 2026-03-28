@@ -1,7 +1,9 @@
 import os
+
 import psycopg
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
@@ -11,6 +13,9 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "pass")
 
 
 def get_conn() -> psycopg.Connection:
+    if SUPABASE_DB_URL:
+        return psycopg.connect(SUPABASE_DB_URL)
+
     if DATABASE_URL:
         return psycopg.connect(DATABASE_URL)
 
