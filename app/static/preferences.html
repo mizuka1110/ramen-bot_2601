@@ -489,6 +489,7 @@
       async function savePreferences() {
         const saveBtn = document.getElementById("saveBtn");
         const weights = collectWeights();
+        const SAVE_TIMEOUT_MS = 15000;
 
         if (!userId) {
           alert(
@@ -501,11 +502,22 @@
         saveBtn.innerHTML = '<span class="spinner"></span>保存中';
 
         try {
-          const response = await fetch("/api/preferences", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, weights }),
-          });
+          const saveController = new AbortController();
+          let saveTimeout = setTimeout(
+            () => saveController.abort("save request timeout"),
+            SAVE_TIMEOUT_MS,
+          );
+          let response;
+          try {
+            response = await fetch("/api/preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_id: userId, weights }),
+              signal: saveController.signal,
+            });
+          } finally {
+            clearTimeout(saveTimeout);
+          }
 
           if (!response.ok) {
             const message = await response.text();

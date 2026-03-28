@@ -2,8 +2,10 @@ import logging
 import math
 import httpx
 import os
+import asyncio
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -196,15 +198,30 @@ async def save_preferences(req: PreferencesRequest):
         req.user_id[:8],
         len(req.weights),
     )
-    try:
-        upsert_user_weights(req.user_id, req.weights)
-    except Exception as e:
+    last_error: Exception | None = None
+    for attempt in (1, 2):
+        try:
+            await run_in_threadpool(upsert_user_weights, req.user_id, req.weights)
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                "save_preferences retryable failure user_id=%s attempt=%d err=%s",
+                req.user_id[:8],
+                attempt,
+                e,
+            )
+            if attempt == 1:
+                await asyncio.sleep(0.2)
+
+    if last_error is not None:
         source = get_db_connection_source()
         logger.exception("save_preferences failed (db_source=%s)", source)
         raise HTTPException(
             status_code=500,
             detail=f"DB save failed (source={source}). Check DB env vars.",
-        ) from e
+        ) from last_error
     logger.info("save_preferences succeeded user_id=%s", req.user_id[:8])
     return {
         "ok": True,
@@ -215,7 +232,7 @@ async def save_preferences(req: PreferencesRequest):
 
 @app.get("/api/preferences")
 async def get_preferences(user_id: str):
-    weights = get_user_weights(user_id)
+    weights = await run_in_threadpool(get_user_weights, user_id)
     return {"weights": weights or {}}
 
 
