@@ -1,7 +1,10 @@
 from app.line.messages import (
+    build_flex_carousel,
+    build_okawari_message,
     build_preference_choice_flex,
     build_preference_menu_flex,
 )
+from app.line.state import clear_search_session, get_search_session, set_search_session
 from app.services.line_client import line_reply
 from app.services.preference_service import (
     PREFERENCE_CATEGORIES,
@@ -9,6 +12,7 @@ from app.services.preference_service import (
     get_preference_weights,
     set_preference,
 )
+from app.services.ramen_search import search_ramen_items
 
 
 async def handle_postback(
@@ -20,6 +24,66 @@ async def handle_postback(
         return
 
     data = str(postback.get("data", ""))
+
+    if data.startswith("ramen:more:"):
+        parts = data.split(":")
+        if len(parts) != 3:
+            await line_reply(
+                reply_token,
+                [{"type": "text", "text": "おかわりをうまく読み取れなかったよ🙏"}],
+            )
+            return
+
+        session = get_search_session(user_id)
+        if not session:
+            await line_reply(
+                reply_token,
+                [{"type": "text", "text": "先に現在地からラーメン検索してね🍜"}],
+            )
+            return
+
+        lat = session.get("lat")
+        lng = session.get("lng")
+        offset = session.get("next_offset")
+        if not isinstance(lat, float) or not isinstance(lng, float) or not isinstance(offset, int):
+            clear_search_session(user_id)
+            await line_reply(
+                reply_token,
+                [{"type": "text", "text": "検索状態が切れたので、もう一度現在地を送ってね🙏"}],
+            )
+            return
+
+        items, had_error, has_more = await search_ramen_items(
+            lat=lat,
+            lng=lng,
+            line_user_id=user_id,
+            offset=offset,
+            page_size=10,
+        )
+        if not items:
+            if had_error:
+                await line_reply(
+                    reply_token,
+                    [{"type": "text", "text": "今ちょっと検索できないみたい🙏"}],
+                )
+            else:
+                await line_reply(
+                    reply_token,
+                    [{"type": "text", "text": "これ以上の候補は見つからなかったよ🍜"}],
+                )
+            clear_search_session(user_id)
+            return
+
+        messages: list[dict] = [build_flex_carousel(items)]
+        next_offset = offset + 10
+        if has_more:
+            set_search_session(user_id, lat=lat, lng=lng, next_offset=next_offset)
+            messages.append(build_okawari_message(next_offset=next_offset))
+        else:
+            clear_search_session(user_id)
+
+        await line_reply(reply_token, messages)
+        return
 
     if data == "pref:menu":
         weights = get_preference_weights(user_id)

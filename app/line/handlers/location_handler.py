@@ -1,5 +1,11 @@
-from app.line.messages import build_flex_carousel
-from app.line.state import WAITING_LOCATION, clear_user_state, get_user_state
+from app.line.messages import build_flex_carousel, build_okawari_message
+from app.line.state import (
+    WAITING_LOCATION,
+    clear_search_session,
+    clear_user_state,
+    get_user_state,
+    set_search_session,
+)
 from app.services.line_client import line_loading, line_reply
 from app.services.ramen_search import search_ramen_items
 
@@ -20,7 +26,7 @@ async def handle_location_message(
             [
                 {
                     "type": "text",
-                    "text": "先に「ラーメン」って送ってね🍜",
+                    "text": "現在、直接の位置送信には対応しておりません🍜",
                 }
             ],
         )
@@ -49,10 +55,12 @@ async def handle_location_message(
 
     await line_loading(user_id)
 
-    items, had_error = await search_ramen_items(
+    items, had_error, has_more = await search_ramen_items(
         lat=lat,
         lng=lng,
         line_user_id=user_id,
+        offset=0,
+        page_size=10,
     )
 
     if not items:
@@ -81,6 +89,14 @@ async def handle_location_message(
         return
 
     flex = build_flex_carousel(items)
-    await line_reply(reply_token, [flex])
+    messages: list[dict] = [flex]
+
+    if has_more:
+        set_search_session(user_id, lat=lat, lng=lng, next_offset=10)
+        messages.append(build_okawari_message(next_offset=10))
+    else:
+        clear_search_session(user_id)
+
+    await line_reply(reply_token, messages)
 
     clear_user_state(user_id)
