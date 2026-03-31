@@ -1,0 +1,857 @@
+diff --git a/app/line/handlers/location_handler.py b/app/line/handlers/location_handler.py
+index 9ddf84e16548a45666fa4d0c1ed0cf49d808d1ff..4ec5834900860d8696311a1bf53f1f094cfd9115 100644
+--- a/app/line/handlers/location_handler.py
++++ b/app/line/handlers/location_handler.py
+@@ -1,86 +1,102 @@
+-from app.line.messages import build_flex_carousel
+-from app.line.state import WAITING_LOCATION, clear_user_state, get_user_state
++from app.line.messages import build_flex_carousel, build_okawari_message
++from app.line.state import (
++    WAITING_LOCATION,
++    clear_search_session,
++    clear_user_state,
++    get_user_state,
++    set_search_session,
++)
+ from app.services.line_client import line_loading, line_reply
+ from app.services.ramen_search import search_ramen_items
+ 
+ 
+ async def handle_location_message(
+     user_id: str,
+     reply_token: str | None,
+     message: dict[str, object],
+ ) -> None:
+     if not reply_token:
+         return
+ 
+     state = get_user_state(user_id)
+ 
+     if state != WAITING_LOCATION:
+         await line_reply(
+             reply_token,
+             [
+                 {
+                     "type": "text",
+                     "text": "先に「ラーメン」って送ってね🍜",
+                 }
+             ],
+         )
+         return
+ 
+     lat_value = message.get("latitude")
+     lng_value = message.get("longitude")
+ 
+     if not isinstance(lat_value, (int, float)) or not isinstance(
+         lng_value, (int, float)
+     ):
+         await line_reply(
+             reply_token,
+             [
+                 {
+                     "type": "text",
+                     "text": "位置情報をうまく受け取れなかったよ🙏",
+                 }
+             ],
+         )
+         clear_user_state(user_id)
+         return
+ 
+     lat = float(lat_value)
+     lng = float(lng_value)
+ 
+     await line_loading(user_id)
+ 
+-    items, had_error = await search_ramen_items(
++    items, had_error, has_more = await search_ramen_items(
+         lat=lat,
+         lng=lng,
+         line_user_id=user_id,
++        offset=0,
++        page_size=10,
+     )
+ 
+     if not items:
+         if had_error:
+             await line_reply(
+                 reply_token,
+                 [
+                     {
+                         "type": "text",
+                         "text": "今ちょっと検索できないみたい🙏",
+                     }
+                 ],
+             )
+         else:
+             await line_reply(
+                 reply_token,
+                 [
+                     {
+                         "type": "text",
+                         "text": "3000m以内にラーメン屋さんが見つかりません…🍜",
+                     }
+                 ],
+             )
+ 
+         clear_user_state(user_id)
+         return
+ 
+     flex = build_flex_carousel(items)
+-    await line_reply(reply_token, [flex])
++    messages: list[dict] = [flex]
+ 
+-    clear_user_state(user_id)
+\ No newline at end of file
++    if has_more:
++        set_search_session(user_id, lat=lat, lng=lng, next_offset=10)
++        messages.append(build_okawari_message(next_offset=10))
++    else:
++        clear_search_session(user_id)
++
++    await line_reply(reply_token, messages)
++
++    clear_user_state(user_id)
+diff --git a/app/line/handlers/postback_handler.py b/app/line/handlers/postback_handler.py
+index 0ccc1a9ebb41bcb190016b35ff28c44a44342892..a0d12cc6cab1c95a776e1e0c56689d1bb1b1e8e2 100644
+--- a/app/line/handlers/postback_handler.py
++++ b/app/line/handlers/postback_handler.py
+@@ -1,48 +1,112 @@
+ from app.line.messages import (
++    build_flex_carousel,
++    build_okawari_message,
+     build_preference_choice_flex,
+     build_preference_menu_flex,
+ )
++from app.line.state import clear_search_session, get_search_session, set_search_session
+ from app.services.line_client import line_reply
+ from app.services.preference_service import (
+     PREFERENCE_CATEGORIES,
+     get_preference_choice_label,
+     get_preference_weights,
+     set_preference,
+ )
++from app.services.ramen_search import search_ramen_items
+ 
+ 
+ async def handle_postback(
+     user_id: str,
+     reply_token: str | None,
+     postback: dict[str, object],
+ ) -> None:
+     if not reply_token:
+         return
+ 
+     data = str(postback.get("data", ""))
+ 
++    if data.startswith("ramen:more:"):
++        parts = data.split(":")
++        if len(parts) != 3:
++            await line_reply(
++                reply_token,
++                [{"type": "text", "text": "おかわりをうまく読み取れなかったよ🙏"}],
++            )
++            return
++
++        session = get_search_session(user_id)
++        if not session:
++            await line_reply(
++                reply_token,
++                [{"type": "text", "text": "先に現在地からラーメン検索してね🍜"}],
++            )
++            return
++
++        lat = session.get("lat")
++        lng = session.get("lng")
++        offset = session.get("next_offset")
++        if not isinstance(lat, float) or not isinstance(lng, float) or not isinstance(offset, int):
++            clear_search_session(user_id)
++            await line_reply(
++                reply_token,
++                [{"type": "text", "text": "検索状態が切れたので、もう一度現在地を送ってね🙏"}],
++            )
++            return
++
++        items, had_error, has_more = await search_ramen_items(
++            lat=lat,
++            lng=lng,
++            line_user_id=user_id,
++            offset=offset,
++            page_size=10,
++        )
++        if not items:
++            if had_error:
++                await line_reply(
++                    reply_token,
++                    [{"type": "text", "text": "今ちょっと検索できないみたい🙏"}],
++                )
++            else:
++                await line_reply(
++                    reply_token,
++                    [{"type": "text", "text": "これ以上の候補は見つからなかったよ🍜"}],
++                )
++            clear_search_session(user_id)
++            return
++
++        messages: list[dict] = [build_flex_carousel(items)]
++        next_offset = offset + 10
++        if has_more:
++            set_search_session(user_id, lat=lat, lng=lng, next_offset=next_offset)
++            messages.append(build_okawari_message(next_offset=next_offset))
++        else:
++            clear_search_session(user_id)
++
++        await line_reply(reply_token, messages)
++        return
++
+     if data == "pref:menu":
+         weights = get_preference_weights(user_id)
+         await line_reply(reply_token, [build_preference_menu_flex(weights)])
+         return
+ 
+     if data.startswith("pref:category:"):
+         category = data.replace("pref:category:", "", 1)
+ 
+         if category not in PREFERENCE_CATEGORIES:
+             await line_reply(
+                 reply_token,
+                 [{"type": "text", "text": "カテゴリをうまく読み取れなかったよ🙏"}],
+             )
+             return
+ 
+         weights = get_preference_weights(user_id)
+         current_value = weights.get(category, 0)
+         await line_reply(
+             reply_token,
+             [build_preference_choice_flex(category, current_value)],
+         )
+         return
+ 
+     if data.startswith("pref:set:"):
+         parts = data.split(":", 3)
+@@ -59,26 +123,26 @@ async def handle_postback(
+             weights = set_preference(user_id, category, choice)
+         except ValueError:
+             await line_reply(
+                 reply_token,
+                 [{"type": "text", "text": "登録内容をうまく読み取れなかったよ🙏"}],
+             )
+             return
+ 
+         choice_label = get_preference_choice_label(choice)
+ 
+         await line_reply(
+             reply_token,
+             [
+                 {
+                     "type": "text",
+                     "text": f"「{category}」を「{choice_label}」で登録したよ🍜",
+                 },
+                 build_preference_menu_flex(weights),
+             ],
+         )
+         return
+ 
+     await line_reply(
+         reply_token,
+         [{"type": "text", "text": "操作をうまく読み取れなかったよ🙏"}],
+-    )
+\ No newline at end of file
++    )
+diff --git a/app/line/messages.py b/app/line/messages.py
+index 263ea1b0d3aff496a3a1bd8c55425bf5bf9891d3..fec0580ad5fa3ed935281fffd4454abaa46b18bd 100644
+--- a/app/line/messages.py
++++ b/app/line/messages.py
+@@ -43,50 +43,52 @@ def _photo_url(photo_reference: str | None, maxwidth: int = 600) -> str:
+ 
+     if photo_reference and base:
+         return f"{base}/shops/photo?ref={photo_reference}&maxwidth={maxwidth}"
+ 
+     if base:
+         return f"{base}/static/no-image.jpg"
+ 
+     # base が無い = LINEが見に行けるURLが作れないのでプレースホルダー
+     return "https://via.placeholder.com/600x338?text=No+Image"
+ 
+ 
+ def _build_meta(vicinity: str, distance_m: int | None) -> str | None:
+     """
+     住所と距離を組み合わせたメタ文字列を返す。
+     どちらも無い場合は None を返す。
+     """
+     parts = []
+     if vicinity:
+         parts.append(vicinity)
+     if distance_m is not None:
+         parts.append(f"{distance_m}m")
+     return "｜".join(parts) if parts else None
+ 
+ 
+ def _weight_status(value: float) -> tuple[str, str]:
++    if value >= 100:
++        return ("中毒", "#7C3AED")
+     if value >= 0.5:
+         return ("めちゃ好き", "#DC2626")
+     if value >= 0.25:
+         return ("好き", "#EA580C")
+     if value <= -0.25:
+         return ("苦手", "#2563EB")
+     return ("未登録", "#6B7280")
+ 
+ 
+ def _build_preference_status_chip(value: float) -> dict:
+     label, color = _weight_status(value)
+     return {
+         "type": "box",
+         "layout": "horizontal",
+         "contents": [
+             {
+                 "type": "text",
+                 "text": label,
+                 "size": "xxs",
+                 "weight": "bold",
+                 "color": "#FFFFFF",
+                 "align": "center",
+                 "gravity": "center",
+                 "flex": 0,
+             }
+@@ -197,60 +199,145 @@ def build_preference_menu_flex(weights: dict[str, float] | None = None) -> dict:
+                         "type": "text",
+                         "text": "気になる項目を押して登録してね",
+                         "size": "sm",
+                         "color": "#6B7280",
+                         "wrap": True,
+                     },
+                     *rows,
+                 ],
+             },
+         },
+     }
+ 
+ 
+ def build_preference_choice_flex(category: str, current_value: float = 0) -> dict:
+     label = PREFERENCE_CATEGORIES.get(category, category)
+ 
+     return {
+         "type": "flex",
+         "altText": f"{label}の好みを登録する",
+         "contents": {
+             "type": "bubble",
+             "body": {
+                 "type": "box",
+                 "layout": "vertical",
+                 "spacing": "md",
++                "contents": [
++                    {
++                        "type": "text",
++                        "text": f"{label}はどれくらい好き？",
++                        "weight": "bold",
++                        "size": "lg",
++                        "wrap": True,
+                     },
++                    {
++                        "type": "text",
++                        "text": "登録するとランキングに反映されます",
++                        "size": "sm",
++                        "color": "#6B7280",
++                        "wrap": True,
++                    },
++                    _build_preference_status_chip(current_value),
++                ],
++            },
+             "footer": {
+                 "type": "box",
+                 "layout": "vertical",
+                 "spacing": "sm",
++                "contents": [
++                    {
++                        "type": "button",
++                        "style": "primary",
++                        "height": "sm",
++                        "color": "#7C3AED",
++                        "action": {
++                            "type": "postback",
++                            "label": "中毒",
++                            "data": f"pref:set:{category}:addict",
++                            "displayText": f"{label}を中毒で登録",
++                        },
++                    },
++                    {
++                        "type": "button",
++                        "style": "primary",
++                        "height": "sm",
++                        "color": "#DC2626",
++                        "action": {
++                            "type": "postback",
++                            "label": "めちゃ好き",
++                            "data": f"pref:set:{category}:love",
++                            "displayText": f"{label}をめちゃ好きで登録",
++                        },
++                    },
++                    {
++                        "type": "button",
++                        "style": "secondary",
++                        "height": "sm",
++                        "action": {
++                            "type": "postback",
++                            "label": "好き",
++                            "data": f"pref:set:{category}:like",
++                            "displayText": f"{label}を好きで登録",
++                        },
++                    },
++                    {
++                        "type": "button",
++                        "style": "secondary",
++                        "height": "sm",
++                        "action": {
++                            "type": "postback",
++                            "label": "苦手",
++                            "data": f"pref:set:{category}:dislike",
++                            "displayText": f"{label}を苦手で登録",
++                        },
++                    },
++                ],
+             },
+         },
+     }
+ 
+ 
++def build_okawari_message(next_offset: int) -> dict:
++    return {
++        "type": "text",
++        "text": "ほかの候補も見る？",
++        "quickReply": {
++            "items": [
++                {
++                    "type": "action",
++                    "action": {
++                        "type": "postback",
++                        "label": "おかわり",
++                        "data": f"ramen:more:{next_offset}",
++                        "displayText": "おかわり",
++                    },
++                }
++            ]
++        },
++    }
++
++
+ def shop_to_bubble(item: dict) -> dict:
+     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
+     label_text, label_bg = _open_label(item.get("open_now"))
+ 
+     vicinity = _short_vicinity(item.get("vicinity"))
+     distance_m = item.get("distance_m")
+     meta = _build_meta(vicinity, distance_m)
+ 
+     rating = item.get("rating")
+     rating_count = item.get("rating_count")
+     rating_text = None
+     if rating is not None:
+         rating_text = f"★{rating}"
+         if rating_count is not None:
+             rating_text += f"（{rating_count}）"
+ 
+     lat = item.get("lat")
+     lng = item.get("lng")
+ 
+     map_url = (
+         f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+         if lat is not None and lng is not None
+         else (item.get("maps_url") or "https://www.google.com/maps")
+     )
+ 
+@@ -372,26 +459,26 @@ def shop_to_bubble(item: dict) -> dict:
+                         {
+                             "type": "text",
+                             "text": "地図を開く",
+                             "size": "sm",
+                             "color": "#2563EB",
+                             "flex": 0,
+                         },
+                     ],
+                 }
+             ],
+         },
+     }
+ 
+ 
+ def build_flex_carousel(items: list[dict]) -> dict:
+     # 念のため None 混入を防ぐ（shop_to_bubbleは基本None返さない想定）
+     bubbles = [b for b in (shop_to_bubble(x) for x in (items or [])[:10]) if b]
+ 
+     return {
+         "type": "flex",
+         "altText": "近くのラーメン店",
+         "contents": {
+             "type": "carousel",
+             "contents": bubbles,
+         },
+-    }
+\ No newline at end of file
++    }
+diff --git a/app/line/state.py b/app/line/state.py
+index b9eb34c27dde41dd25aea9bee0f01a2b9136c3a3..943c49da70ad567f2f196ca45c4ea377b66752f2 100644
+--- a/app/line/state.py
++++ b/app/line/state.py
+@@ -1,16 +1,33 @@
+ WAITING_NONE = "none"
+ WAITING_LOCATION = "waiting_location"
+ 
+ _user_states: dict[str, str] = {}
++_user_search_sessions: dict[str, dict[str, float | int]] = {}
+ 
+ 
+ def get_user_state(user_id: str) -> str:
+     return _user_states.get(user_id, WAITING_NONE)
+ 
+ 
+ def set_user_state(user_id: str, state: str) -> None:
+     _user_states[user_id] = state
+ 
+ 
+ def clear_user_state(user_id: str) -> None:
+-    _user_states[user_id] = WAITING_NONE
+\ No newline at end of file
++    _user_states[user_id] = WAITING_NONE
++
++
++def set_search_session(user_id: str, lat: float, lng: float, next_offset: int) -> None:
++    _user_search_sessions[user_id] = {
++        "lat": lat,
++        "lng": lng,
++        "next_offset": next_offset,
++    }
++
++
++def get_search_session(user_id: str) -> dict[str, float | int] | None:
++    return _user_search_sessions.get(user_id)
++
++
++def clear_search_session(user_id: str) -> None:
++    _user_search_sessions.pop(user_id, None)
+diff --git a/app/services/preference_service.py b/app/services/preference_service.py
+index 76e73b4fbefaf2ca516fb7a1428bd91e20091765..9b4cc550164deb39a9cff69c9eee9551734e733a 100644
+--- a/app/services/preference_service.py
++++ b/app/services/preference_service.py
+@@ -1,51 +1,53 @@
+ from app.db.user_pref_repo import get_user_weights, upsert_user_weights
+ 
+ PREFERENCE_CATEGORIES = {
+     "あっさり": "あっさり",
+     "こってり": "こってり",
+     "魚介": "魚介系",
+     "煮干し": "煮干し",
+     "鶏白湯": "鶏白湯",
+     "豚骨": "豚骨",
+     "醤油": "醤油",
+     "味噌": "味噌",
+     "塩": "塩",
+     "辛い": "辛い",
+     "家系": "家系",
+     "二郎系": "二郎系",
+ }
+ 
+ PREFERENCE_VALUE_MAP = {
+     "like": 0.25,
+     "love": 0.5,
++    "addict": 100.0,
+     "dislike": -0.25,
+ }
+ 
+ PREFERENCE_LABEL_MAP = {
+     "like": "好き",
+     "love": "めちゃ好き",
++    "addict": "中毒",
+     "dislike": "苦手",
+ }
+ 
+ 
+ def get_preference_weights(line_user_id: str) -> dict[str, float]:
+     return get_user_weights(line_user_id)
+ 
+ 
+ def set_preference(
+     line_user_id: str,
+     category: str,
+     choice: str,
+ ) -> dict[str, float]:
+     if category not in PREFERENCE_CATEGORIES:
+         raise ValueError(f"unknown category: {category}")
+ 
+     if choice not in PREFERENCE_VALUE_MAP:
+         raise ValueError(f"unknown choice: {choice}")
+ 
+     weights = get_user_weights(line_user_id)
+     weights[category] = PREFERENCE_VALUE_MAP[choice]
+     upsert_user_weights(line_user_id, weights)
+     return weights
+ 
+ 
+diff --git a/app/services/ramen_search.py b/app/services/ramen_search.py
+index 348d92b876ee46d0591702a8f04b2669c3c5ed77..13a799d5c34964777a011aac3b352645ddfeb03d 100644
+--- a/app/services/ramen_search.py
++++ b/app/services/ramen_search.py
+@@ -1,89 +1,92 @@
+ import asyncio
+ import logging
+ 
+ from app.db.user_pref_repo import get_user_weights
+ from app.services.ai_summary import extract_ramen_categories, summarize_reviews_30
+ from app.services.places import (
+     get_place_reviews,
+     nearby_result_to_items,
+     search_nearby,
+ )
+ from app.services.places_cache import get_cached, set_cached
+ from app.services.ranking import sort_items
+ 
+ logger = logging.getLogger("uvicorn.error")
+ 
+ _ENRICH_CONCURRENCY = 4
+ _PER_ITEM_TIMEOUT_SEC = 8.0
+ _ENRICH_TOTAL_TIMEOUT_SEC = 12.0
+ 
+ 
+ async def search_ramen_items(
+     lat: float,
+     lng: float,
+     line_user_id: str | None = None,
+-) -> tuple[list[dict[str, object]], bool]:
++    offset: int = 0,
++    page_size: int = 10,
++) -> tuple[list[dict[str, object]], bool, bool]:
+     q = "ラーメン"
+     had_error = False
+     items: list[dict[str, object]] = []
+ 
+     for radius in (1000, 2000, 3000):
+         cached = get_cached(lat, lng, q, radius)
+ 
+         try:
+             if cached:
+                 result = cached
+             else:
+                 result = await search_nearby(lat=lat, lng=lng, q=q, radius=radius)
+                 set_cached(lat, lng, q, radius, result)
+         except Exception:
+             had_error = True
+             if cached:
+                 result = cached
+             else:
+                 continue
+ 
+         items = nearby_result_to_items(
+             result,
+             user_lat=lat,
+             user_lng=lng,
+-            limit=15,
++            limit=20,
+         )
+ 
+         if items:
+             break
+ 
+     if not items:
+-        return [], had_error
++        return [], had_error, False
+ 
+     weights = get_user_weights(line_user_id) if line_user_id else {}
+     items = sort_items(items, weights=weights)
+-    items = items[:10]
++    page_items = items[offset:offset + page_size]
++    has_more = offset + page_size < len(items)
+ 
+-    await enrich_items(items)
+-    return items, had_error
++    await enrich_items(page_items)
++    return page_items, had_error, has_more
+ 
+ 
+ async def _enrich_item(
+     item: dict[str, object],
+     semaphore: asyncio.Semaphore,
+ ) -> None:
+     place_id_value = item.get("place_id")
+     if not isinstance(place_id_value, str) or not place_id_value:
+         return
+ 
+     async with semaphore:
+         try:
+             detail = await asyncio.wait_for(
+                 get_place_reviews(place_id_value),
+                 timeout=_PER_ITEM_TIMEOUT_SEC,
+             )
+         except Exception as e:
+             logger.warning(
+                 "get_place_reviews skipped place_id=%s: %s",
+                 place_id_value,
+                 e,
+             )
+             return
+ 
+     reviews = detail.get("reviews") or []
+diff --git a/app/static/preferences.html b/app/static/preferences.html
+index e178ed173bb364643ab50e214508cb8280677de0..ca53c4dabf3148c2a68aea647c4074f5032bf34e 100644
+--- a/app/static/preferences.html
++++ b/app/static/preferences.html
+@@ -350,141 +350,158 @@
+           <button type="button" data-value="neutral">普通</button>
+           <button type="button" data-value="dislike">苦手</button>
+         </div>
+       </div>
+ 
+       <div class="row">
+         <div class="label">二郎系</div>
+         <div class="segment" data-key="二郎系">
+           <button type="button" data-value="love">大好き</button>
+           <button type="button" data-value="like">好き</button>
+           <button type="button" data-value="neutral">普通</button>
+           <button type="button" data-value="dislike">苦手</button>
+         </div>
+       </div>
+ 
+       <button id="saveBtn" class="save" type="button">保存する</button>
+       <button id="closeBtn" class="close" type="button">閉じる</button>
+     </div>
+ 
+     <script>
+       let userId = null;
+ 
+       const STRONG_CATEGORIES = new Set(["あっさり", "こってり", "辛い"]);
+ 
+       const STRONG_SCORE_MAP = {
++        addict: 100,
+         love: 0.5,
+         like: 0.25,
+         neutral: 0,
+         dislike: -0.25,
+       };
+ 
+       const WEAK_SCORE_MAP = {
++        addict: 100,
+         love: 0.25,
+         like: 0.125,
+         neutral: 0,
+         dislike: -0.125,
+       };
+ 
+       async function main() {
+         try {
+           await liff.init({
+             liffId: "2009360861-I31kIVzt",
+           });
+ 
+           if (!liff.isLoggedIn()) {
+             liff.login();
+             return;
+           }
+ 
+           const profile = await liff.getProfile();
+           userId = profile.userId;
+ 
+           await loadPreferences();
+         } catch (error) {
+           document.body.insertAdjacentHTML(
+             "afterbegin",
+             `<div style="background:red;color:white;padding:10px;word-break:break-all">${error}</div>`,
+           );
+         }
+       }
+ 
+       function setupSegments() {
++        ensureAddictButtons();
+         document.querySelectorAll(".segment").forEach((segment) => {
+           segment.querySelectorAll("button").forEach((button) => {
+             button.addEventListener("click", () => {
+               segment.querySelectorAll("button").forEach((b) => {
+                 b.classList.remove("active");
+               });
+               button.classList.add("active");
+             });
+           });
+         });
+       }
+ 
++      function ensureAddictButtons() {
++        document.querySelectorAll(".segment").forEach((segment) => {
++          if (segment.querySelector('button[data-value="addict"]')) return;
++          const firstButton = segment.querySelector("button");
++          if (!firstButton) return;
++
++          const addictButton = document.createElement("button");
++          addictButton.type = "button";
++          addictButton.dataset.value = "addict";
++          addictButton.textContent = "中毒";
++          segment.insertBefore(addictButton, firstButton);
++        });
++      }
++
+       function valueToWeight(category, value) {
+         const scoreMap = STRONG_CATEGORIES.has(category)
+           ? STRONG_SCORE_MAP
+           : WEAK_SCORE_MAP;
+         return scoreMap[value] ?? 0;
+       }
+ 
+       function collectWeights() {
+         const result = {};
+         document.querySelectorAll(".segment").forEach((segment) => {
+           const category = segment.dataset.key;
+           const activeButton = segment.querySelector("button.active");
+           if (!activeButton) return;
+           const value = activeButton.dataset.value;
+           result[category] = valueToWeight(category, value);
+         });
+         return result;
+       }
+ 
+       function normalizeWeights(weights) {
+         return Object.fromEntries(
+           Object.entries(weights || {}).sort(([a], [b]) => a.localeCompare(b)),
+         );
+       }
+ 
+       async function loadPreferences() {
+         if (!userId) return;
+ 
+         const response = await fetch(
+           `/api/preferences?user_id=${encodeURIComponent(userId)}`,
+         );
+ 
+         if (!response.ok) throw new Error("load failed");
+ 
+         const data = await response.json();
+         applyInitialWeights(data.weights || {});
+       }
+ 
+       function weightToValue(category, weight) {
+         const scoreMap = STRONG_CATEGORIES.has(category)
+-          ? { 0.5: "love", 0.25: "like", 0: "neutral", "-0.25": "dislike" }
+-          : { 0.25: "love", 0.125: "like", 0: "neutral", "-0.125": "dislike" };
++          ? { 100: "addict", 0.5: "love", 0.25: "like", 0: "neutral", "-0.25": "dislike" }
++          : { 100: "addict", 0.25: "love", 0.125: "like", 0: "neutral", "-0.125": "dislike" };
+         return scoreMap[String(weight)];
+       }
+ 
+       function applyInitialWeights(weights) {
+         document.querySelectorAll(".segment").forEach((segment) => {
+           const category = segment.dataset.key;
+           const weight = weights[category];
+           if (weight === undefined) return;
+ 
+           const value = weightToValue(category, weight);
+           if (!value) return;
+ 
+           segment
+             .querySelectorAll("button")
+             .forEach((b) => b.classList.remove("active"));
+ 
+           const targetButton = segment.querySelector(
+             `button[data-value="${value}"]`,
+           );
+           if (targetButton) targetButton.classList.add("active");
+         });
+       }
+ 
+       async function savePreferences() {
+         const saveBtn = document.getElementById("saveBtn");

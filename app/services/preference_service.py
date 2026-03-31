@@ -18,12 +18,14 @@ PREFERENCE_CATEGORIES = {
 PREFERENCE_VALUE_MAP = {
     "like": 0.25,
     "love": 0.5,
+    "addict": 100.0,
     "dislike": -0.25,
 }
 
 PREFERENCE_LABEL_MAP = {
     "like": "好き",
     "love": "めちゃ好き",
+    "addict": "中毒",
     "dislike": "苦手",
 }
 

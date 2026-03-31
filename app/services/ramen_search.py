@@ -22,7 +22,9 @@ async def search_ramen_items(
     lat: float,
     lng: float,
     line_user_id: str | None = None,
-) -> tuple[list[dict[str, object]], bool]:
+    offset: int = 0,
+    page_size: int = 10,
+) -> tuple[list[dict[str, object]], bool, bool]:
     q = "ラーメン"
     had_error = False
     items: list[dict[str, object]] = []
@@ -47,21 +49,22 @@ async def search_ramen_items(
             result,
             user_lat=lat,
             user_lng=lng,
-            limit=15,
+            limit=20,
         )
 
         if items:
             break
 
     if not items:
-        return [], had_error
+        return [], had_error, False
 
     weights = get_user_weights(line_user_id) if line_user_id else {}
     items = sort_items(items, weights=weights)
-    items = items[:10]
+    page_items = items[offset:offset + page_size]
+    has_more = offset + page_size < len(items)
 
-    await enrich_items(items)
-    return items, had_error
+    await enrich_items(page_items)
+    return page_items, had_error, has_more
 
 
 async def _enrich_item(

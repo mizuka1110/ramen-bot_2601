@@ -372,6 +372,7 @@
       const STRONG_CATEGORIES = new Set(["あっさり", "こってり", "辛い"]);
 
       const STRONG_SCORE_MAP = {
+        addict: 100,
         love: 0.5,
         like: 0.25,
         neutral: 0,
@@ -379,6 +380,7 @@
       };
 
       const WEAK_SCORE_MAP = {
+        addict: 100,
         love: 0.25,
         like: 0.125,
         neutral: 0,
@@ -409,6 +411,7 @@
       }
 
       function setupSegments() {
+        ensureAddictButtons();
         document.querySelectorAll(".segment").forEach((segment) => {
           segment.querySelectorAll("button").forEach((button) => {
             button.addEventListener("click", () => {
@@ -418,6 +421,20 @@
               button.classList.add("active");
             });
           });
+        });
+      }
+
+      function ensureAddictButtons() {
+        document.querySelectorAll(".segment").forEach((segment) => {
+          if (segment.querySelector('button[data-value="addict"]')) return;
+          const firstButton = segment.querySelector("button");
+          if (!firstButton) return;
+
+          const addictButton = document.createElement("button");
+          addictButton.type = "button";
+          addictButton.dataset.value = "addict";
+          addictButton.textContent = "中毒";
+          segment.insertBefore(addictButton, firstButton);
         });
       }
 
@@ -461,8 +478,8 @@
 
       function weightToValue(category, weight) {
         const scoreMap = STRONG_CATEGORIES.has(category)
-          ? { 0.5: "love", 0.25: "like", 0: "neutral", "-0.25": "dislike" }
-          : { 0.25: "love", 0.125: "like", 0: "neutral", "-0.125": "dislike" };
+          ? { 100: "addict", 0.5: "love", 0.25: "like", 0: "neutral", "-0.25": "dislike" }
+          : { 100: "addict", 0.25: "love", 0.125: "like", 0: "neutral", "-0.125": "dislike" };
         return scoreMap[String(weight)];
       }
 

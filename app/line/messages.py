@@ -65,6 +65,8 @@ def _build_meta(vicinity: str, distance_m: int | None) -> str | None:
 
 
 def _weight_status(value: float) -> tuple[str, str]:
+    if value >= 100:
+        return ("中毒", "#7C3AED")
     if value >= 0.5:
         return ("めちゃ好き", "#DC2626")
     if value >= 0.25:
@@ -219,12 +221,97 @@ def build_preference_choice_flex(category: str, current_value: float = 0) -> dic
                 "type": "box",
                 "layout": "vertical",
                 "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": f"{label}はどれくらい好き？",
+                        "weight": "bold",
+                        "size": "lg",
+                        "wrap": True,
                     },
+                    {
+                        "type": "text",
+                        "text": "登録するとランキングに反映されます",
+                        "size": "sm",
+                        "color": "#6B7280",
+                        "wrap": True,
+                    },
+                    _build_preference_status_chip(current_value),
+                ],
+            },
             "footer": {
                 "type": "box",
                 "layout": "vertical",
                 "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "height": "sm",
+                        "color": "#7C3AED",
+                        "action": {
+                            "type": "postback",
+                            "label": "中毒",
+                            "data": f"pref:set:{category}:addict",
+                            "displayText": f"{label}を中毒で登録",
+                        },
+                    },
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "height": "sm",
+                        "color": "#DC2626",
+                        "action": {
+                            "type": "postback",
+                            "label": "めちゃ好き",
+                            "data": f"pref:set:{category}:love",
+                            "displayText": f"{label}をめちゃ好きで登録",
+                        },
+                    },
+                    {
+                        "type": "button",
+                        "style": "secondary",
+                        "height": "sm",
+                        "action": {
+                            "type": "postback",
+                            "label": "好き",
+                            "data": f"pref:set:{category}:like",
+                            "displayText": f"{label}を好きで登録",
+                        },
+                    },
+                    {
+                        "type": "button",
+                        "style": "secondary",
+                        "height": "sm",
+                        "action": {
+                            "type": "postback",
+                            "label": "苦手",
+                            "data": f"pref:set:{category}:dislike",
+                            "displayText": f"{label}を苦手で登録",
+                        },
+                    },
+                ],
             },
+        },
+    }
+
+
+def build_okawari_message(next_offset: int) -> dict:
+    return {
+        "type": "text",
+        "text": "続きのランキングも見る？",
+        "quickReply": {
+            "items": [
+                {
+                    "type": "action",
+                    "action": {
+                        "type": "postback",
+                        "label": "おかわり🍜",
+                        "data": f"ramen:more:{next_offset}",
+                        "displayText": "おかわり🍜",
+                    },
+                }
+            ]
         },
     }
 
