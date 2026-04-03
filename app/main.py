@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import GOOGLE_PLACES_API_KEY
-from app.db.db import get_db_connection_source
+from app.db.db import get_conn, get_db_connection_source
 from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 from app.services.line_client import line_push
 from app.line.webhook import router as line_router
@@ -296,3 +296,34 @@ async def health() -> JSONResponse:
         content={"status": "ok"},
         headers={"Cache-Control": "public, max-age=60"},
     )
+
+
+def _check_db_health() -> None:
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
+    finally:
+        conn.close()
+
+
+@app.get("/health/db")
+async def health_db() -> JSONResponse:
+    try:
+        await run_in_threadpool(_check_db_health)
+        return JSONResponse(
+            content={"status": "ok", "db": "ok"},
+            headers={"Cache-Control": "no-store"},
+        )
+    except Exception:
+        logger.exception("health_db failed")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "ng",
+                "db": "ng",
+                "db_source": get_db_connection_source(),
+            },
+            headers={"Cache-Control": "no-store"},
+        )
