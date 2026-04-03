@@ -58,12 +58,16 @@ async def search_ramen_items(
     if not items:
         return [], had_error, False
 
-    weights = get_user_weights(line_user_id) if line_user_id else {}
-    items = sort_items(items, weights=weights)
-    page_items = items[offset:offset + page_size]
-    has_more = offset + page_size < len(items)
+    # NOTE:
+    # Preference ranking depends on extracted ramen categories.
+    # Enrich all candidates before sorting so "中毒" etc. are reflected.
+    await enrich_items(items)
 
-    await enrich_items(page_items)
+    weights = get_user_weights(line_user_id) if line_user_id else {}
+    ranked_items = sort_items(items, weights=weights)
+    page_items = ranked_items[offset:offset + page_size]
+    has_more = offset + page_size < len(ranked_items)
+
     return page_items, had_error, has_more
 
 
