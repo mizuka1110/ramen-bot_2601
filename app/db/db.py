@@ -51,18 +51,21 @@ def _normalize_db_url_port(db_url: str) -> str:
     if normalized_port == parsed.port:
         return db_url
 
-    userinfo = ""
-    if parsed.username:
-        userinfo = parsed.username
-        if parsed.password:
-            userinfo += f":{parsed.password}"
-        userinfo += "@"
+    auth_prefix = ""
+    host_and_port = parsed.netloc
+    if "@" in host_and_port:
+        auth_prefix, host_and_port = host_and_port.rsplit("@", 1)
+        auth_prefix = f"{auth_prefix}@"
 
-    host = parsed.hostname or ""
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
+    host = host_and_port
+    if host_and_port.startswith("["):
+        closing_bracket_idx = host_and_port.find("]")
+        if closing_bracket_idx != -1:
+            host = host_and_port[: closing_bracket_idx + 1]
+    elif ":" in host_and_port:
+        host = host_and_port.rsplit(":", 1)[0]
 
-    netloc = f"{userinfo}{host}:{normalized_port}"
+    netloc = f"{auth_prefix}{host}:{normalized_port}"
     return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
 
 
