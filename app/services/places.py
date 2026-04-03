@@ -3,7 +3,19 @@ import math
 from app.config import GOOGLE_PLACES_API_KEY, GOOGLE_NEARBY_URL
 
 GOOGLE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
-NON_STORE_KEYWORDS = ("モニュメント", "記念碑", "像", "ミュージアム", "博物館", "ファクトリー", "工場")
+NON_STORE_KEYWORDS = (
+    # 飲食店（ラーメン以外のジャンル）
+    "寿司", "すし", "鮨",
+    "とんかつ",
+    "焼肉", "焼き肉",
+    "天ぷら", "てんぷら",
+
+    # 施設・観光スポット・その他
+    "モニュメント", "記念碑", "像",
+    "ミュージアム", "博物館",
+    "ファクトリー", "工場",
+)
+
 FOOD_PLACE_TYPES = {
     "restaurant",
     "meal_takeaway",
