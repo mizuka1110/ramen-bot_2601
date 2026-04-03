@@ -16,6 +16,8 @@ logger = logging.getLogger("uvicorn.error")
 _ENRICH_CONCURRENCY = 4
 _PER_ITEM_TIMEOUT_SEC = 8.0
 _ENRICH_TOTAL_TIMEOUT_SEC = 12.0
+_SEARCH_RADII_M = (1000, 2000, 3000)
+_MIN_RESULTS_FOR_STOP = 3
 
 
 async def search_ramen_items(
@@ -24,12 +26,14 @@ async def search_ramen_items(
     line_user_id: str | None = None,
     offset: int = 0,
     page_size: int = 10,
-) -> tuple[list[dict[str, object]], bool, bool]:
+) -> tuple[list[dict[str, object]], bool, bool, int | None]:
     q = "ラーメン"
     had_error = False
-    items: list[dict[str, object]] = []
+    items_by_place_id: dict[str, dict[str, object]] = {}
+    used_radius: int | None = None
 
-    for radius in (1000, 2000, 3000):
+    for radius in _SEARCH_RADII_M:
+        used_radius = radius
         cached = get_cached(lat, lng, q, radius)
 
         try:
@@ -45,18 +49,28 @@ async def search_ramen_items(
             else:
                 continue
 
-        items = nearby_result_to_items(
+        radius_items = nearby_result_to_items(
             result,
             user_lat=lat,
             user_lng=lng,
             limit=20,
         )
 
-        if items:
+        for item in radius_items:
+            place_id_value = item.get("place_id")
+            if isinstance(place_id_value, str) and place_id_value:
+                dedupe_key = place_id_value
+            else:
+                dedupe_key = f"{item.get('name')}:{item.get('lat')}:{item.get('lng')}"
+            items_by_place_id[dedupe_key] = item
+
+        if len(items_by_place_id) >= _MIN_RESULTS_FOR_STOP:
             break
 
+    items = list(items_by_place_id.values())
+
     if not items:
-        return [], had_error, False
+        return [], had_error, False, used_radius
 
     # NOTE:
     # Preference ranking depends on extracted ramen categories.
@@ -68,7 +82,7 @@ async def search_ramen_items(
     page_items = ranked_items[offset:offset + page_size]
     has_more = offset + page_size < len(ranked_items)
 
-    return page_items, had_error, has_more
+    return page_items, had_error, has_more, used_radius
 
 
 async def _enrich_item(

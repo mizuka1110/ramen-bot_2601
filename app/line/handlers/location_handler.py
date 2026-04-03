@@ -1,4 +1,8 @@
-from app.line.messages import build_flex_carousel, build_okawari_message
+from app.line.messages import (
+    build_flex_carousel,
+    build_okawari_message,
+    build_search_radius_message,
+)
 from app.line.state import (
     WAITING_LOCATION,
     clear_search_session,
@@ -55,7 +59,7 @@ async def handle_location_message(
 
     await line_loading(user_id)
 
-    items, had_error, has_more = await search_ramen_items(
+    items, had_error, has_more, used_radius = await search_ramen_items(
         lat=lat,
         lng=lng,
         line_user_id=user_id,
@@ -90,6 +94,8 @@ async def handle_location_message(
 
     flex = build_flex_carousel(items)
     messages: list[dict] = [flex]
+    if used_radius is not None:
+        messages.append(build_search_radius_message(used_radius))
 
     if has_more:
         set_search_session(user_id, lat=lat, lng=lng, next_offset=10)

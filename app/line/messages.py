@@ -316,6 +316,13 @@ def build_okawari_message(next_offset: int) -> dict:
     }
 
 
+def build_search_radius_message(radius_m: int) -> dict:
+    return {
+        "type": "text",
+        "text": f"{radius_m}mまで検索しました🍜",
+    }
+
+
 def shop_to_bubble(item: dict) -> dict:
     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
     label_text, label_bg = _open_label(item.get("open_now"))

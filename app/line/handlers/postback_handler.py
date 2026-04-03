@@ -53,7 +53,7 @@ async def handle_postback(
             )
             return
 
-        items, had_error, has_more = await search_ramen_items(
+        items, had_error, has_more, _used_radius = await search_ramen_items(
             lat=lat,
             lng=lng,
             line_user_id=user_id,
