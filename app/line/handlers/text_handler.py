@@ -52,16 +52,25 @@ async def handle_text_message(
                             "type": "box",
                             "layout": "vertical",
                             "spacing": "sm",
+                            "alignItems": "center",
                             "contents": [
                                 {
-                                    "type": "button",
-                                    "style": "primary",
-                                    "color": "#ff8c3a",
-                                    "action": {
-                                        "type": "uri",
-                                        "label": "日時を選ぶ",
-                                        "uri": datetime_url,
-                                    },
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "width": "70%",
+                                    "contents": [
+                                        {
+                                            "type": "button",
+                                            "style": "primary",
+                                            "height": "sm",
+                                            "color": "#ff8c3a",
+                                            "action": {
+                                                "type": "uri",
+                                                "label": "日時を選ぶ",
+                                                "uri": datetime_url,
+                                            },
+                                        }
+                                    ],
                                 }
                             ],
                         },

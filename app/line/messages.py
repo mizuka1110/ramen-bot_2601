@@ -323,7 +323,11 @@ def build_search_radius_message(radius_m: int) -> dict:
     }
 
 
-def shop_to_bubble(item: dict, show_business_hours: bool = False) -> dict:
+def shop_to_bubble(
+    item: dict,
+    show_business_hours: bool = False,
+    datetime_notice_text: str | None = None,
+) -> dict:
     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
     label_text, label_bg = _open_label(item.get("open_now"))
 
@@ -380,12 +384,24 @@ def shop_to_bubble(item: dict, show_business_hours: bool = False) -> dict:
                 "margin": "sm",
             }
         )
+        if isinstance(datetime_notice_text, str) and datetime_notice_text.strip():
+            status_contents.append(
+                {
+                    "type": "text",
+                    "text": datetime_notice_text,
+                    "size": "xxs",
+                    "color": "#9CA3AF",
+                    "wrap": True,
+                    "flex": 0,
+                    "margin": "xs",
+                }
+            )
 
     body_contents = [
         {
             "type": "box",
-            "layout": "horizontal",
-            "alignItems": "center",
+            "layout": "vertical",
+            "alignItems": "flex-start",
             "contents": status_contents,
         },
         {
@@ -491,12 +507,20 @@ def shop_to_bubble(item: dict, show_business_hours: bool = False) -> dict:
     }
 
 
-def build_flex_carousel(items: list[dict], show_business_hours: bool = False) -> dict:
+def build_flex_carousel(
+    items: list[dict],
+    show_business_hours: bool = False,
+    datetime_notice_text: str | None = None,
+) -> dict:
     # 念のため None 混入を防ぐ（shop_to_bubbleは基本None返さない想定）
     bubbles = [
         b
         for b in (
-            shop_to_bubble(x, show_business_hours=show_business_hours)
+            shop_to_bubble(
+                x,
+                show_business_hours=show_business_hours,
+                datetime_notice_text=datetime_notice_text,
+            )
             for x in (items or [])[:10]
         )
         if b
