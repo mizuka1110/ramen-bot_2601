@@ -4,10 +4,8 @@ from app.line.messages import (
     build_search_radius_message,
 )
 from app.line.state import (
-    WAITING_LOCATION,
     clear_search_session,
     clear_user_state,
-    get_user_state,
     set_search_session,
 )
 from app.services.line_client import line_loading, line_reply
@@ -20,20 +18,6 @@ async def handle_location_message(
     message: dict[str, object],
 ) -> None:
     if not reply_token:
-        return
-
-    state = get_user_state(user_id)
-
-    if state != WAITING_LOCATION:
-        await line_reply(
-            reply_token,
-            [
-                {
-                    "type": "text",
-                    "text": "現在、直接の位置送信には対応しておりません🍜",
-                }
-            ],
-        )
         return
 
     lat_value = message.get("latitude")

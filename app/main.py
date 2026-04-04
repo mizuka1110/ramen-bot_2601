@@ -187,6 +187,11 @@ async def shops_photo(
 async def preferences_page():
     return FileResponse("app/static/preferences.html")
 
+
+@app.get("/preferences/location")
+async def preferences_location_page():
+    return FileResponse("app/static/preferences.html")
+
 ##好み登録API
 
 @app.post("/api/preferences")
