@@ -5,25 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ラーメンの好み</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script>
-      (() => {
-        const params = new URLSearchParams(window.location.search);
-        const liffStateRaw = params.get("liff.state") || "";
-        let liffState = liffStateRaw;
-        try {
-          liffState = decodeURIComponent(liffStateRaw);
-        } catch (_) {}
-        const isLocationMode =
-          params.get("mode") === "location" ||
-          liffState.includes("mode=location") ||
-          /\/location(?:$|\?)/.test(liffState) ||
-          /\/preferences\/location(?:$|\?)/.test(window.location.pathname);
-        document.documentElement.dataset.pageMode = isLocationMode
-          ? "location"
-          : "preferences";
-      })();
-    </script>
-
     <style>
       * {
         box-sizing: border-box;
@@ -67,10 +48,6 @@
         border-radius: 14px;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
       }
-      html[data-page-mode="location"] .row {
-        display: none;
-      }
-
       .label {
         flex: 0 0 72px;
         font-size: 14px;
@@ -144,29 +121,6 @@
         opacity: 0.9;
       }
 
-      .map-picker-secondary {
-        display: block;
-        width: 92%;
-        margin: 10px auto 0;
-        min-height: 40px;
-        padding: 12px 16px;
-        border: 2px solid #f08a3c;
-        border-radius: 14px;
-        background: #fffaf6;
-        color: #e07a2b;
-        font-size: 16px;
-        font-weight: 700;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        transition:
-          transform 0.12s ease,
-          background-color 0.12s ease,
-          color 0.12s ease;
-      }
-
-      .map-picker-secondary:active {
-        transform: scale(0.98);
-      }
-
       .close {
         width: 100%;
         margin-top: 10px;
@@ -189,81 +143,6 @@
         background: #e8e8ed;
         transform: scale(0.96);
         color: #3c3c43;
-      }
-
-      .location-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 8px;
-      }
-
-      .location-actions button {
-        min-height: 42px;
-        border-radius: 12px;
-        border: 1px solid #e6e6ea;
-        background: #ffffff;
-        color: #444;
-        font-weight: 700;
-      }
-
-      .location-actions button.active {
-        border-color: #ff8c3a;
-        color: #ff8c3a;
-        background: #fff6ef;
-      }
-
-      .datetime-panel {
-        margin-top: 10px;
-        padding: 0;
-        border-radius: 0;
-        background: transparent;
-        border: none;
-      }
-
-      .datetime-panel.hidden {
-        display: none;
-      }
-
-      .datetime-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        justify-items: center;
-      }
-
-      @media (max-width: 420px) {
-        .datetime-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      @media (max-width: 420px) {
-        .datetime-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .datetime-grid label {
-        display: block;
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 6px;
-      }
-
-      .datetime-field {
-        width: 100%;
-        max-width: 180px;
-      }
-
-      .datetime-grid input {
-        width: 100%;
-        min-height: 42px;
-        border-radius: 10px;
-        border: 1px solid #e6e6ea;
-        padding: 8px 10px;
-        background: #f3f4f6;
-        display: block;
       }
 
       .spinner {
@@ -487,7 +366,6 @@
 
     <script>
       let userId = null;
-      const pageMode = document.documentElement.dataset.pageMode || "preferences";
 
       const STRONG_CATEGORIES = new Set(["あっさり", "こってり", "辛い"]);
 
@@ -521,11 +399,6 @@
           const profile = await liff.getProfile();
           userId = profile.userId;
 
-          if (pageMode === "location") {
-            prepareLocationModeUI();
-            return;
-          }
-
           await loadPreferences();
         } catch (error) {
           document.body.insertAdjacentHTML(
@@ -533,227 +406,6 @@
             `<div style="background:red;color:white;padding:10px;word-break:break-all">${error}</div>`,
           );
         }
-      }
-
-      function prepareLocationModeUI() {
-        const titleEl = document.querySelector("h1");
-        const subEl = document.querySelector(".sub");
-        if (titleEl) titleEl.textContent = "ラーメンを検索する";
-        if (subEl) subEl.textContent = "下のボタンで現在地をLINEトークに送ります。";
-
-        document.querySelectorAll(".row").forEach((row) => {
-          row.style.display = "none";
-        });
-
-        const saveBtn = document.getElementById("saveBtn");
-        saveBtn.innerText = "現在地から";
-
-        const container = document.querySelector(".container");
-        if (!container) return;
-
-        const zone = document.createElement("div");
-        zone.innerHTML = `
-          <div class="location-actions">
-            <button id="searchNowBtn" class="active" type="button">今すぐ</button>
-            <button id="searchWithDatetimeBtn" type="button">日時指定</button>
-          </div>
-          <div id="datetimePanel" class="datetime-panel hidden">
-            <div class="datetime-grid">
-              <div class="datetime-field">
-                <label for="searchDate">日付</label>
-                <input id="searchDate" type="date" />
-              </div>
-              <div class="datetime-field">
-                <label for="searchTime">時間</label>
-                <input id="searchTime" type="time" />
-              </div>
-            </div>
-          </div>
-        `;
-        saveBtn.parentNode?.insertBefore(zone, saveBtn);
-
-        const mapPickerBtn = document.createElement("button");
-        mapPickerBtn.id = "openMapPickerBtn";
-        mapPickerBtn.className = "map-picker-secondary";
-        mapPickerBtn.type = "button";
-        mapPickerBtn.textContent = "場所指定";
-        saveBtn.insertAdjacentElement("afterend", mapPickerBtn);
-
-        const nowBtn = document.getElementById("searchNowBtn");
-        const withDatetimeBtn = document.getElementById("searchWithDatetimeBtn");
-        const openMapPickerBtn = document.getElementById("openMapPickerBtn");
-        const datetimePanel = document.getElementById("datetimePanel");
-
-        if (!nowBtn || !withDatetimeBtn || !datetimePanel || !openMapPickerBtn) return;
-
-        nowBtn.addEventListener("click", () => {
-          nowBtn.classList.add("active");
-          withDatetimeBtn.classList.remove("active");
-          datetimePanel.classList.add("hidden");
-        });
-
-        withDatetimeBtn.addEventListener("click", () => {
-          withDatetimeBtn.classList.add("active");
-          nowBtn.classList.remove("active");
-          datetimePanel.classList.remove("hidden");
-          localStorage.setItem("ramen-location-mode", "datetime");
-        });
-
-        nowBtn.addEventListener("click", () => {
-          localStorage.setItem("ramen-location-mode", "now");
-        });
-
-        openMapPickerBtn.addEventListener("click", () => {
-          openLineLocationPicker();
-        });
-
-        initializeDatetimeInputs();
-        const savedMode = localStorage.getItem("ramen-location-mode");
-        if (savedMode === "datetime") {
-          withDatetimeBtn.click();
-        }
-      }
-
-      async function getCurrentPosition() {
-        return await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0,
-          });
-        });
-      }
-
-      async function sendCurrentLocation(triggerSource = "save") {
-        const saveBtn = document.getElementById("saveBtn");
-        const mapBtn = document.getElementById("openMapPickerBtn");
-        const activeBtn = triggerSource === "map" ? mapBtn : saveBtn;
-        const defaultLabel =
-          triggerSource === "map"
-            ? "場所指定"
-            : "現在地から";
-
-        if (!saveBtn || !activeBtn) return;
-
-        saveBtn.disabled = true;
-        if (mapBtn) mapBtn.disabled = true;
-        activeBtn.innerHTML = '<span class="spinner"></span>検索中';
-        try {
-          if (!navigator.geolocation) {
-            throw new Error("この端末は位置情報取得に対応していません。");
-          }
-
-          const pos = await getCurrentPosition();
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-
-          const nowMode = document
-            .getElementById("searchNowBtn")
-            ?.classList.contains("active");
-          const payload = {
-            timezone: "Asia/Tokyo",
-            datetime: "",
-          };
-          if (!nowMode) {
-            const dt = collectSelectedDatetimeIsoJst();
-            if (dt) payload.datetime = dt;
-          }
-
-          await liff.sendMessages([
-            {
-              type: "location",
-              title: "ラーメン検索",
-              address: `datetime=${encodeURIComponent(payload.datetime)}&timezone=${encodeURIComponent(payload.timezone)}`,
-              latitude: lat,
-              longitude: lng,
-            },
-          ]);
-          if (liff.isInClient()) {
-            liff.closeWindow();
-          }
-        } catch (error) {
-          alert(
-            `位置情報の送信に失敗しました。通信状況をご確認の上、再度お試しください。
-${error.message || error}`,
-          );
-          activeBtn.innerText = defaultLabel;
-          saveBtn.disabled = false;
-          if (mapBtn) mapBtn.disabled = false;
-        }
-      }
-
-      function openLineLocationPicker() {
-        const nowMode = document
-          .getElementById("searchNowBtn")
-          ?.classList.contains("active");
-        if (!nowMode) {
-          alert(
-            "日時指定は「現在地から」から利用できます。場所指定で送信する場合は「今すぐ」で送信されます。",
-          );
-        }
-
-        if (liff.isInClient()) {
-          liff.openWindow({
-            url: "line://nv/location",
-            external: false,
-          });
-          return;
-        }
-
-        alert("LINEアプリ内で開くと地図から場所を選べます。");
-      }
-
-      function initializeDatetimeInputs() {
-        const dateInput = document.getElementById("searchDate");
-        const timeInput = document.getElementById("searchTime");
-        if (!dateInput || !timeInput) return;
-
-        const nowJst = new Date(
-          new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }),
-        );
-        const roundedHour = new Date(nowJst);
-        if (roundedHour.getMinutes() >= 30) {
-          roundedHour.setHours(roundedHour.getHours() + 1);
-        }
-        roundedHour.setMinutes(0, 0, 0);
-        const minDate = formatDateJst(nowJst);
-        const maxDateObj = new Date(nowJst);
-        maxDateObj.setDate(maxDateObj.getDate() + 14);
-        dateInput.min = minDate;
-        dateInput.max = formatDateJst(maxDateObj);
-        const storedDate = localStorage.getItem("ramen-search-date");
-        const storedTime = localStorage.getItem("ramen-search-time");
-        dateInput.value =
-          storedDate && storedDate >= dateInput.min && storedDate <= dateInput.max
-            ? storedDate
-            : minDate;
-        timeInput.value =
-          storedTime && /^\d{2}:\d{2}$/.test(storedTime)
-            ? storedTime
-            : `${String(roundedHour.getHours()).padStart(2, "0")}:00`;
-
-        dateInput.addEventListener("change", () => {
-          localStorage.setItem("ramen-search-date", dateInput.value);
-        });
-        timeInput.addEventListener("change", () => {
-          localStorage.setItem("ramen-search-time", timeInput.value);
-        });
-      }
-
-      function formatDateJst(dateObj) {
-        const y = dateObj.getFullYear();
-        const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-        const d = String(dateObj.getDate()).padStart(2, "0");
-        return `${y}-${m}-${d}`;
-      }
-
-      function collectSelectedDatetimeIsoJst() {
-        const dateInput = document.getElementById("searchDate");
-        const timeInput = document.getElementById("searchTime");
-        if (!dateInput || !timeInput || !dateInput.value || !timeInput.value) {
-          return null;
-        }
-        return `${dateInput.value}T${timeInput.value}:00+09:00`;
       }
 
       function setupSegments() {
@@ -929,10 +581,6 @@ ${error.message || error}`,
       }
 
       document.getElementById("saveBtn").addEventListener("click", () => {
-        if (pageMode === "location") {
-          sendCurrentLocation();
-          return;
-        }
         savePreferences();
       });
 
