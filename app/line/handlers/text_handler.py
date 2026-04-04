@@ -17,7 +17,9 @@ async def handle_text_message(
     if "日時・場所を指定" in text:
         datetime_url = DATETIME_LIFF_URL
         if not datetime_url and PUBLIC_BASE_URL:
-            datetime_url = f"{PUBLIC_BASE_URL}/static/datetime.html"
+            datetime_url = (
+                f"{PUBLIC_BASE_URL}/static/datetime.html?liffId={DATETIME_LIFF_ID}"
+            )
         if not datetime_url and DATETIME_LIFF_ID:
             datetime_url = f"https://liff.line.me/{DATETIME_LIFF_ID}"
         await line_reply(
