@@ -1,6 +1,4 @@
 from datetime import datetime
-from urllib.parse import urlencode
-
 from app.config import DATETIME_LIFF_ID, DATETIME_LIFF_URL, PUBLIC_BASE_URL
 from app.line.state import WAITING_LOCATION, set_user_datetime, set_user_state
 from app.services.line_client import line_reply
@@ -17,9 +15,11 @@ async def handle_text_message(
     text = str(message.get("text", "")).strip()
 
     if "日時・場所を指定" in text:
-        datetime_url = DATETIME_LIFF_URL or f"{PUBLIC_BASE_URL}/static/datetime.html"
-        if not DATETIME_LIFF_URL and DATETIME_LIFF_ID:
-            datetime_url = f"{datetime_url}?{urlencode({'liffId': DATETIME_LIFF_ID})}"
+        datetime_url = DATETIME_LIFF_URL
+        if not datetime_url and DATETIME_LIFF_ID:
+            datetime_url = f"https://liff.line.me/{DATETIME_LIFF_ID}"
+        if not datetime_url:
+            datetime_url = f"{PUBLIC_BASE_URL}/static/datetime.html"
         await line_reply(
             reply_token,
             [
@@ -41,7 +41,7 @@ async def handle_text_message(
                                 },
                                 {
                                     "type": "text",
-                                    "text": "行く予定の日の情報を確認できます。",
+                                    "text": "行く予定日に設定した日時の情報を確認できます。",
                                     "wrap": True,
                                     "size": "sm",
                                     "color": "#666666",

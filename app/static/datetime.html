@@ -14,7 +14,7 @@
         color: #222;
       }
       .card {
-        max-width: 520px;
+        width: min(520px, 100%);
         margin: 0 auto;
         background: #fff;
         border-radius: 12px;
@@ -38,7 +38,9 @@
         display: block;
         max-width: 100%;
         min-height: 44px;
-        padding: 10px;
+        padding: 10px 12px;
+        padding-right: 42px;
+        font-size: 16px;
         margin-bottom: 12px;
         border: 1px solid #ddd;
         border-radius: 8px;
@@ -67,7 +69,7 @@
   <body>
     <div class="card">
       <h1>日時を指定</h1>
-      <p>行く予定の日の情報を確認できます。</p>
+      <p>行く予定日に設定した日時の情報を確認できます。</p>
       <input id="dt" type="datetime-local" />
       <button id="send" type="button">LINEに送る</button>
       <p id="status" class="note"></p>
@@ -76,7 +78,10 @@
       const dt = document.getElementById("dt");
       const send = document.getElementById("send");
       const status = document.getElementById("status");
-      const LIFF_ID = new URLSearchParams(window.location.search).get("liffId");
+      const DEFAULT_LIFF_ID = "2009360861-udWtvLeU";
+      const LIFF_ID =
+        new URLSearchParams(window.location.search).get("liffId") || DEFAULT_LIFF_ID;
+      let liffReady = false;
 
       const now = new Date();
       const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -91,10 +96,11 @@
       const initLiff = async () => {
         try {
           if (!LIFF_ID) {
-            setStatus("LIFF ID未設定のため、通常送信モードで動作します。");
+            setStatus("直接トークへ自動送信するにはLIFF ID設定が必要です（未設定のため通常送信）。");
             return;
           }
           await liff.init({ liffId: LIFF_ID });
+          liffReady = true;
           if (!liff.isLoggedIn()) {
             liff.login();
             return;
@@ -112,7 +118,7 @@
         send.disabled = true;
 
         try {
-          if (window.liff && liff.isInClient()) {
+          if (window.liff && liffReady && liff.isInClient()) {
             await liff.sendMessages([{ type: "text", text }]);
             liff.closeWindow();
             return;

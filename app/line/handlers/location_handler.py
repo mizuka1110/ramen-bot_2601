@@ -43,7 +43,8 @@ async def handle_location_message(
 
     lat = float(lat_value)
     lng = float(lng_value)
-    search_datetime = get_user_datetime(user_id) or datetime.now(timezone.utc).isoformat(timespec="minutes")
+    selected_datetime = get_user_datetime(user_id)
+    search_datetime = selected_datetime or datetime.now(timezone.utc).isoformat(timespec="minutes")
 
     await line_loading(user_id)
 
@@ -53,6 +54,7 @@ async def handle_location_message(
         line_user_id=user_id,
         offset=0,
         page_size=10,
+        search_datetime=search_datetime,
     )
 
     if not items:
@@ -80,9 +82,9 @@ async def handle_location_message(
         clear_user_state(user_id)
         return
 
-    flex = build_flex_carousel(items)
+    flex = build_flex_carousel(items, show_business_hours=selected_datetime is not None)
     messages: list[dict] = [flex]
-    if used_radius is not None:
+    if used_radius is not None and used_radius >= 2000:
         messages.append(build_search_radius_message(used_radius))
 
     if has_more:

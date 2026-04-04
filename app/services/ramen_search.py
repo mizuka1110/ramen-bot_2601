@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime
 
 from app.db.user_pref_repo import get_user_weights
 from app.services.ai_summary import extract_ramen_categories, summarize_reviews_30
@@ -26,6 +27,7 @@ async def search_ramen_items(
     line_user_id: str | None = None,
     offset: int = 0,
     page_size: int = 10,
+    search_datetime: str | None = None,
 ) -> tuple[list[dict[str, object]], bool, bool, int | None]:
     q = "ラーメン"
     had_error = False
@@ -75,7 +77,7 @@ async def search_ramen_items(
     # NOTE:
     # Preference ranking depends on extracted ramen categories.
     # Enrich all candidates before sorting so "中毒" etc. are reflected.
-    await enrich_items(items)
+    await enrich_items(items, search_datetime=search_datetime)
 
     weights = get_user_weights(line_user_id) if line_user_id else {}
     ranked_items = sort_items(items, weights=weights)
@@ -88,6 +90,7 @@ async def search_ramen_items(
 async def _enrich_item(
     item: dict[str, object],
     semaphore: asyncio.Semaphore,
+    search_datetime: str | None = None,
 ) -> None:
     place_id_value = item.get("place_id")
     if not isinstance(place_id_value, str) or not place_id_value:
@@ -109,6 +112,7 @@ async def _enrich_item(
 
     reviews = detail.get("reviews") or []
     editorial_summary = detail.get("editorial_summary")
+    opening_hours = detail.get("opening_hours") or {}
 
     category_task = extract_ramen_categories(editorial_summary, reviews)
     summary_task = summarize_reviews_30(reviews)
@@ -137,10 +141,38 @@ async def _enrich_item(
             summary_result,
         )
 
+    hours_text = _hours_for_date(opening_hours, search_datetime)
+    if hours_text:
+        item["business_hours_text"] = hours_text
 
-async def enrich_items(items: list[dict[str, object]]) -> None:
+
+def _hours_for_date(opening_hours: dict[str, object], search_datetime: str | None) -> str | None:
+    if not search_datetime:
+        return None
+
+    weekday_text = opening_hours.get("weekday_text")
+    if not isinstance(weekday_text, list) or len(weekday_text) != 7:
+        return None
+
+    try:
+        target_dt = datetime.fromisoformat(search_datetime)
+    except ValueError:
+        return None
+
+    entry = weekday_text[target_dt.weekday()]
+    if not isinstance(entry, str):
+        return None
+
+    if "：" in entry:
+        return entry.split("：", 1)[1].strip()
+    if ":" in entry:
+        return entry.split(":", 1)[1].strip()
+    return entry.strip() or None
+
+
+async def enrich_items(items: list[dict[str, object]], search_datetime: str | None = None) -> None:
     semaphore = asyncio.Semaphore(_ENRICH_CONCURRENCY)
-    tasks = [_enrich_item(item, semaphore) for item in items]
+    tasks = [_enrich_item(item, semaphore, search_datetime=search_datetime) for item in items]
 
     try:
         await asyncio.wait_for(
