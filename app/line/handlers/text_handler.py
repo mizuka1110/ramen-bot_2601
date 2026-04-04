@@ -92,7 +92,7 @@ async def handle_text_message(
                                 },
                                 {
                                     "type": "text",
-                                    "text": "位置送信用LIFFを開いて、現在地を送信してね。",
+                                    "text": "検索メニューを開いて、現在地送信や場所指定で探してね。",
                                     "wrap": True,
                                     "size": "sm",
                                     "color": "#666666",
@@ -112,7 +112,7 @@ async def handle_text_message(
                                     "color": "#ff8c3a",
                                     "action": {
                                         "type": "uri",
-                                        "label": "現在地を送信する",
+                                        "label": "検索メニューを開く",
                                         "uri": location_liff_url,
                                     },
                                 }
