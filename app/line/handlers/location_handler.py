@@ -1,13 +1,14 @@
+from datetime import datetime, timezone
+
 from app.line.messages import (
     build_flex_carousel,
     build_okawari_message,
     build_search_radius_message,
 )
 from app.line.state import (
-    WAITING_LOCATION,
     clear_search_session,
     clear_user_state,
-    get_user_state,
+    get_user_datetime,
     set_search_session,
 )
 from app.services.line_client import line_loading, line_reply
@@ -20,20 +21,6 @@ async def handle_location_message(
     message: dict[str, object],
 ) -> None:
     if not reply_token:
-        return
-
-    state = get_user_state(user_id)
-
-    if state != WAITING_LOCATION:
-        await line_reply(
-            reply_token,
-            [
-                {
-                    "type": "text",
-                    "text": "現在、直接の位置送信には対応しておりません🍜",
-                }
-            ],
-        )
         return
 
     lat_value = message.get("latitude")
@@ -56,6 +43,7 @@ async def handle_location_message(
 
     lat = float(lat_value)
     lng = float(lng_value)
+    search_datetime = get_user_datetime(user_id) or datetime.now(timezone.utc).isoformat(timespec="minutes")
 
     await line_loading(user_id)
 
@@ -98,7 +86,13 @@ async def handle_location_message(
         messages.append(build_search_radius_message(used_radius))
 
     if has_more:
-        set_search_session(user_id, lat=lat, lng=lng, next_offset=10)
+        set_search_session(
+            user_id,
+            lat=lat,
+            lng=lng,
+            next_offset=10,
+            search_datetime=search_datetime,
+        )
         messages.append(build_okawari_message(next_offset=10))
     else:
         clear_search_session(user_id)

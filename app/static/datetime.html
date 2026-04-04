@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>日時指定</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 24px;
+        background: #fffaf5;
+        color: #222;
+      }
+      .card {
+        max-width: 520px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      p {
+        margin: 0 0 16px;
+        color: #555;
+      }
+      input,
+      button {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      input {
+        padding: 10px;
+        margin-bottom: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      button {
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        background: #ff8c3a;
+        color: white;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>日時を指定</h1>
+      <p>送信するとLINEに「日時指定:YYYY-MM-DDTHH:mm」を送れます。</p>
+      <input id="dt" type="datetime-local" />
+      <button id="send" type="button">LINEに送る</button>
+    </div>
+    <script>
+      const dt = document.getElementById("dt");
+      const send = document.getElementById("send");
+
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      dt.value = local;
+
+      send.addEventListener("click", () => {
+        if (!dt.value) return;
+        const text = `日時指定:${dt.value}`;
+        window.location.href = `line://msg/text/${encodeURIComponent(text)}`;
+      });
+    </script>
+  </body>
+</html>

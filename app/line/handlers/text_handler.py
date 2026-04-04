@@ -1,5 +1,7 @@
-from app.config import PUBLIC_BASE_URL
-from app.line.state import WAITING_LOCATION, set_user_state
+from datetime import datetime
+
+from app.config import DATETIME_LIFF_URL, PUBLIC_BASE_URL
+from app.line.state import WAITING_LOCATION, set_user_datetime, set_user_state
 from app.services.line_client import line_reply
 
 
@@ -12,6 +14,94 @@ async def handle_text_message(
         return
 
     text = str(message.get("text", "")).strip()
+
+    if "場所・日時を指定" in text:
+        datetime_url = DATETIME_LIFF_URL or f"{PUBLIC_BASE_URL}/static/datetime.html"
+        await line_reply(
+            reply_token,
+            [
+                {
+                    "type": "flex",
+                    "altText": "場所・日時を指定",
+                    "contents": {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "場所・日時を指定",
+                                    "weight": "bold",
+                                    "size": "lg",
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "以下から日時を設定してください。",
+                                    "wrap": True,
+                                    "size": "sm",
+                                    "color": "#666666",
+                                },
+                            ],
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "sm",
+                            "contents": [
+                                {
+                                    "type": "button",
+                                    "style": "primary",
+                                    "color": "#ff8c3a",
+                                    "action": {
+                                        "type": "uri",
+                                        "label": "日時を選ぶ",
+                                        "uri": datetime_url,
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                }
+            ],
+        )
+        return
+
+    if text.startswith("日時指定:"):
+        raw_datetime = text.replace("日時指定:", "", 1).strip()
+        try:
+            parsed = datetime.fromisoformat(raw_datetime)
+        except ValueError:
+            await line_reply(
+                reply_token,
+                [{"type": "text", "text": "日時をうまく読み取れなかったよ🙏"}],
+            )
+            return
+
+        set_user_datetime(user_id, parsed.isoformat(timespec="minutes"))
+        set_user_state(user_id, WAITING_LOCATION)
+        await line_reply(
+            reply_token,
+            [
+                {
+                    "type": "text",
+                    "text": "位置情報を送ってください📍",
+                    "quickReply": {
+                        "items": [
+                            {
+                                "type": "action",
+                                "action": {
+                                    "type": "location",
+                                    "label": "現在地を送る",
+                                },
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+        return
 
     if "好み" in text:
         preferences_url = "https://liff.line.me/2009360861-I31kIVzt"
