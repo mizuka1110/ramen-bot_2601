@@ -45,6 +45,7 @@ async def handle_postback(
         lat = session.get("lat")
         lng = session.get("lng")
         offset = session.get("next_offset")
+        search_datetime = session.get("search_datetime")
         if not isinstance(lat, float) or not isinstance(lng, float) or not isinstance(offset, int):
             clear_search_session(user_id)
             await line_reply(
@@ -77,7 +78,13 @@ async def handle_postback(
         messages: list[dict] = [build_flex_carousel(items)]
         next_offset = offset + 10
         if has_more:
-            set_search_session(user_id, lat=lat, lng=lng, next_offset=next_offset)
+            set_search_session(
+                user_id,
+                lat=lat,
+                lng=lng,
+                next_offset=next_offset,
+                search_datetime=search_datetime if isinstance(search_datetime, str) else None,
+            )
             messages.append(build_okawari_message(next_offset=next_offset))
         else:
             clear_search_session(user_id)
