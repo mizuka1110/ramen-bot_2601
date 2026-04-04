@@ -80,10 +80,9 @@
       const dt = document.getElementById("dt");
       const send = document.getElementById("send");
       const status = document.getElementById("status");
-      const DEFAULT_LIFF_ID = "";
-      const LIFF_ID =
+      const DEFAULT_LIFF_ID = "2009360861-udWtvLeU";
+      const liffId =
         new URLSearchParams(window.location.search).get("liffId") || DEFAULT_LIFF_ID;
-      let liffReady = false;
 
       const now = new Date();
       const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -95,47 +94,40 @@
         status.textContent = text;
       };
 
-      const initLiff = async () => {
-        try {
-          if (!LIFF_ID) {
-            setStatus("直接トークへ自動送信するにはLIFF ID設定が必要です（未設定のため通常送信）。");
-            return;
-          }
-          await liff.init({ liffId: LIFF_ID });
-          liffReady = true;
+      liff
+        .init({ liffId })
+        .then(() => {
           if (!liff.isLoggedIn()) {
             liff.login();
             return;
           }
-        } catch (error) {
+
+          send.addEventListener("click", async () => {
+            if (!dt.value) return;
+
+            const text = `日時指定:${dt.value}`;
+            send.disabled = true;
+
+            try {
+              if (liff.isInClient()) {
+                await liff.sendMessages([{ type: "text", text }]);
+                liff.closeWindow();
+              } else {
+                window.location.href = `line://msg/text/${encodeURIComponent(text)}`;
+              }
+            } catch (error) {
+              console.error(error);
+              setStatus("送信に失敗しました。もう一度お試しください。");
+            } finally {
+              send.disabled = false;
+            }
+          });
+        })
+        .catch((error) => {
           console.error(error);
+          alert(`LIFFの初期化に失敗しました: ${error}`);
           setStatus("LIFFの初期化に失敗しました。URL設定を確認してください。");
-        }
-      };
-
-      send.addEventListener("click", async () => {
-        if (!dt.value) return;
-
-        const text = `日時指定:${dt.value}`;
-        send.disabled = true;
-
-        try {
-          if (window.liff && liffReady && liff.isInClient()) {
-            await liff.sendMessages([{ type: "text", text }]);
-            liff.closeWindow();
-            return;
-          }
-
-          window.location.href = `line://msg/text/${encodeURIComponent(text)}`;
-        } catch (error) {
-          console.error(error);
-          setStatus("送信に失敗しました。もう一度お試しください。");
-        } finally {
-          send.disabled = false;
-        }
-      });
-
-      initLiff();
+        });
     </script>
   </body>
 </html>
