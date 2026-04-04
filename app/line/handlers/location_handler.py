@@ -91,7 +91,7 @@ async def handle_location_message(
             timestamp_label = selected_datetime
         datetime_notice_message = {
             "type": "text",
-            "text": f"※ {timestamp_label}時点の営業情報です。最新状況と異なる場合があります。",
+            "text": f"※{timestamp_label}時点の営業情報です。実際の状況と異なる場合があります。",
         }
 
     flex = build_flex_carousel(
@@ -99,13 +99,32 @@ async def handle_location_message(
         show_business_hours=selected_datetime is not None,
     )
     messages: list[dict] = []
+    messages.append(flex)
     if datetime_notice_message:
         messages.append(datetime_notice_message)
-    messages.append(flex)
     if used_radius is not None and used_radius >= 2000:
         messages.append(build_search_radius_message(used_radius))
 
-    if has_more:
+    if selected_datetime:
+        messages.append(
+            {
+                "type": "text",
+                "text": "同じ時間の別の場所で検索しますか？",
+                "quickReply": {
+                    "items": [
+                        {
+                            "type": "action",
+                            "action": {
+                                "type": "location",
+                                "label": "地図を開く",
+                            },
+                        }
+                    ]
+                },
+            }
+        )
+        clear_search_session(user_id)
+    elif has_more:
         set_search_session(
             user_id,
             lat=lat,

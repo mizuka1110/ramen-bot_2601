@@ -29,17 +29,31 @@
         margin: 0 0 16px;
         color: #555;
       }
-      #dt,
+      .datetime-picker,
       button {
         width: 100%;
         box-sizing: border-box;
       }
-      #dt {
+      .datetime-picker {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .time-picker {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      select {
         border: 1px solid #ddd;
         border-radius: 8px;
         padding: 12px;
         font-size: 16px;
-        margin-bottom: 12px;
+        background: #fff;
+      }
+      .divider {
+        margin: 6px 0 12px;
+        font-size: 14px;
+        color: #666;
       }
       button {
         padding: 12px;
@@ -60,19 +74,64 @@
     <div class="card">
       <h1>日時を指定</h1>
       <p>設定した日時の情報を検索できます。</p>
-      <input id="dt" type="datetime-local" />
-      <button id="send" type="button">LINEに送る</button>
+      <div class="datetime-picker">
+        <select id="year"></select>
+        <select id="month"></select>
+        <select id="day"></select>
+      </div>
+      <div class="divider">↓ 時刻を選択</div>
+      <div class="datetime-picker time-picker">
+        <select id="hour"></select>
+        <select id="minute"></select>
+      </div>
+      <button id="send" type="button">設定する</button>
     </div>
 
     <script>
-      const dt = document.getElementById("dt");
+      const year = document.getElementById("year");
+      const month = document.getElementById("month");
+      const day = document.getElementById("day");
+      const hour = document.getElementById("hour");
+      const minute = document.getElementById("minute");
       const send = document.getElementById("send");
 
       const now = new Date();
-      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
-      dt.value = local;
+
+      function buildOptions(select, from, to, suffix = "", pad = false) {
+        for (let i = from; i <= to; i += 1) {
+          const option = document.createElement("option");
+          const value = pad ? String(i).padStart(2, "0") : String(i);
+          option.value = value;
+          option.textContent = `${i}${suffix}`;
+          select.appendChild(option);
+        }
+      }
+
+      function daysInMonth(y, m) {
+        return new Date(Number(y), Number(m), 0).getDate();
+      }
+
+      buildOptions(year, now.getFullYear(), now.getFullYear() + 1, "年");
+      buildOptions(month, 1, 12, "月", true);
+      buildOptions(hour, 0, 23, "時", true);
+      buildOptions(minute, 0, 59, "分", true);
+
+      year.value = String(now.getFullYear());
+      month.value = String(now.getMonth() + 1).padStart(2, "0");
+      hour.value = String(now.getHours()).padStart(2, "0");
+      minute.value = String(now.getMinutes()).padStart(2, "0");
+
+      function syncDays() {
+        const maxDays = daysInMonth(year.value, month.value);
+        const prev = day.value || String(now.getDate()).padStart(2, "0");
+        day.innerHTML = "";
+        buildOptions(day, 1, maxDays, "日", true);
+        day.value = Number(prev) <= maxDays ? prev : String(maxDays).padStart(2, "0");
+      }
+
+      year.addEventListener("change", syncDays);
+      month.addEventListener("change", syncDays);
+      syncDays();
 
       const liffId =
         new URLSearchParams(window.location.search).get("liffId") || "2009360861-udWtvLeU";
@@ -81,10 +140,9 @@
         .init({ liffId })
         .then(() => {
           send.addEventListener("click", async () => {
-            if (!dt.value) return;
             send.disabled = true;
             send.textContent = "送信中...";
-            const text = `日時指定:${dt.value}`;
+            const text = `日時指定:${year.value}-${month.value}-${day.value}T${hour.value}:${minute.value}`;
 
             try {
               if (liff.isInClient()) {
@@ -96,7 +154,7 @@
             } catch (err) {
               alert("送信に失敗しました: " + err);
               send.disabled = false;
-              send.textContent = "LINEに送る";
+              send.textContent = "設定する";
             }
           });
         })

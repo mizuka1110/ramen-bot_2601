@@ -1,6 +1,11 @@
 from datetime import datetime
 from app.config import DATETIME_LIFF_ID, DATETIME_LIFF_URL, PUBLIC_BASE_URL
-from app.line.state import WAITING_LOCATION, set_user_datetime, set_user_state
+from app.line.state import (
+    WAITING_LOCATION,
+    clear_user_datetime,
+    set_user_datetime,
+    set_user_state,
+)
 from app.services.line_client import line_reply
 
 
@@ -13,6 +18,31 @@ async def handle_text_message(
         return
 
     text = str(message.get("text", "")).strip()
+
+    if "今すぐ検索" in text:
+        clear_user_datetime(user_id)
+        set_user_state(user_id, WAITING_LOCATION)
+        await line_reply(
+            reply_token,
+            [
+                {
+                    "type": "text",
+                    "text": "了解！\n\n下のボタンから検索地点を送ってね",
+                    "quickReply": {
+                        "items": [
+                            {
+                                "type": "action",
+                                "action": {
+                                    "type": "location",
+                                    "label": "地図を開く",
+                                },
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+        return
 
     if "日時・場所を指定" in text:
         datetime_url = DATETIME_LIFF_URL
@@ -100,14 +130,14 @@ async def handle_text_message(
             [
                 {
                     "type": "text",
-                    "text": "位置情報を送ってください📍",
+                    "text": "続いて、検索地点を送ってください📍",
                     "quickReply": {
                         "items": [
                             {
                                 "type": "action",
                                 "action": {
                                     "type": "location",
-                                    "label": "現在地を送る",
+                                    "label": "地図を開く",
                                 },
                             }
                         ]
@@ -174,20 +204,21 @@ async def handle_text_message(
         return
 
     if "ラーメン" in text:
+        clear_user_datetime(user_id)
         set_user_state(user_id, WAITING_LOCATION)
         await line_reply(
             reply_token,
             [
                 {
                     "type": "text",
-                    "text": "了解！\n\n下のボタンから現在地を送ってね",
+                    "text": "了解！\n\n下のボタンから検索地点を送ってね",
                     "quickReply": {
                         "items": [
                             {
                                 "type": "action",
                                 "action": {
                                     "type": "location",
-                                    "label": "現在地を送る",
+                                    "label": "地図を開く",
                                 },
                             }
                         ]
