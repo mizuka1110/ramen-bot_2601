@@ -15,14 +15,14 @@ async def handle_text_message(
 
     text = str(message.get("text", "")).strip()
 
-    if "場所・日時を指定" in text:
+    if "日時・場所を指定" in text:
         datetime_url = DATETIME_LIFF_URL or f"{PUBLIC_BASE_URL}/static/datetime.html"
         await line_reply(
             reply_token,
             [
                 {
                     "type": "flex",
-                    "altText": "場所・日時を指定",
+                    "altText": "日時・場所を指定",
                     "contents": {
                         "type": "bubble",
                         "body": {
@@ -32,7 +32,7 @@ async def handle_text_message(
                             "contents": [
                                 {
                                     "type": "text",
-                                    "text": "場所・日時を指定",
+                                    "text": "日時・場所を指定",
                                     "weight": "bold",
                                     "size": "lg",
                                 },
