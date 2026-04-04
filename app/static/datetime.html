@@ -84,6 +84,7 @@
         <select id="hour"></select>
         <select id="minute"></select>
       </div>
+      <p id="envHint"></p>
       <button id="send" type="button">設定する</button>
     </div>
 
@@ -94,11 +95,12 @@
       const hour = document.getElementById("hour");
       const minute = document.getElementById("minute");
       const send = document.getElementById("send");
+      const envHint = document.getElementById("envHint");
 
       const now = new Date();
 
-      function buildOptions(select, from, to, suffix = "", pad = false) {
-        for (let i = from; i <= to; i += 1) {
+      function buildOptions(select, from, to, suffix = "", pad = false, step = 1) {
+        for (let i = from; i <= to; i += step) {
           const option = document.createElement("option");
           const value = pad ? String(i).padStart(2, "0") : String(i);
           option.value = value;
@@ -114,12 +116,12 @@
       buildOptions(year, now.getFullYear(), now.getFullYear() + 1, "年");
       buildOptions(month, 1, 12, "月", true);
       buildOptions(hour, 0, 23, "時", true);
-      buildOptions(minute, 0, 59, "分", true);
+      buildOptions(minute, 0, 50, "分", true, 10);
 
       year.value = String(now.getFullYear());
       month.value = String(now.getMonth() + 1).padStart(2, "0");
       hour.value = String(now.getHours()).padStart(2, "0");
-      minute.value = String(now.getMinutes()).padStart(2, "0");
+      minute.value = String(Math.floor(now.getMinutes() / 10) * 10).padStart(2, "0");
 
       function syncDays() {
         const maxDays = daysInMonth(year.value, month.value);
@@ -139,6 +141,11 @@
       liff
         .init({ liffId })
         .then(() => {
+          if (!liff.isInClient()) {
+            envHint.textContent =
+              "※ LINEアプリ内で開かれていないため、自動送信できない場合があります。";
+          }
+
           send.addEventListener("click", async () => {
             send.disabled = true;
             send.textContent = "送信中...";
@@ -148,6 +155,13 @@
               if (liff.isInClient()) {
                 await liff.sendMessages([{ type: "text", text }]);
                 liff.closeWindow();
+              } else if (liff.isApiAvailable("shareTargetPicker")) {
+                const result = await liff.shareTargetPicker([{ type: "text", text }]);
+                if (result === null) {
+                  alert("送信がキャンセルされました。");
+                  send.disabled = false;
+                  send.textContent = "設定する";
+                }
               } else {
                 window.location.href = `line://msg/text/${encodeURIComponent(text)}`;
               }
