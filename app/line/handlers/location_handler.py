@@ -124,7 +124,7 @@ async def handle_search_with_location(
 
     flex = build_flex_carousel(items)
     messages: list[dict] = [flex]
-    if used_radius is not None:
+    if used_radius is not None and used_radius > 1000:
         messages.append(build_search_radius_message(used_radius))
 
     if has_more:

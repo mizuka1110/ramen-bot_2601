@@ -171,10 +171,10 @@
 
       .datetime-panel {
         margin-top: 10px;
-        padding: 12px;
-        border-radius: 12px;
-        background: #fff;
-        border: 1px solid #eee;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        border: none;
       }
 
       .datetime-panel.hidden {
@@ -187,19 +187,27 @@
         gap: 10px;
       }
 
+      @media (max-width: 420px) {
+        .datetime-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
       .datetime-grid label {
         display: block;
         font-size: 12px;
         color: #666;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
       }
 
       .datetime-grid input {
         width: 100%;
-        min-height: 38px;
+        min-height: 42px;
         border-radius: 10px;
         border: 1px solid #e6e6ea;
-        padding: 8px;
+        padding: 10px;
+        background: #f3f4f6;
+        display: block;
       }
 
       .spinner {
@@ -489,7 +497,7 @@
       function prepareLocationModeUI() {
         const titleEl = document.querySelector("h1");
         const subEl = document.querySelector(".sub");
-        if (titleEl) titleEl.textContent = "現在地を送信";
+        if (titleEl) titleEl.textContent = "ラーメンを検索する";
         if (subEl) subEl.textContent = "下のボタンで現在地をLINEトークに送ります。";
 
         document.querySelectorAll(".row").forEach((row) => {
@@ -497,7 +505,7 @@
         });
 
         const saveBtn = document.getElementById("saveBtn");
-        saveBtn.innerText = "検索する";
+        saveBtn.innerText = "地図を出して検索する";
 
         const container = document.querySelector(".container");
         if (!container) return;
@@ -511,12 +519,12 @@
           <div id="datetimePanel" class="datetime-panel hidden">
             <div class="datetime-grid">
               <div>
-                <label for="searchDate">日付（JST）</label>
+                <label for="searchDate">日付</label>
                 <input id="searchDate" type="date" />
               </div>
               <div>
-                <label for="searchTime">時間（1時間刻み）</label>
-                <input id="searchTime" type="time" step="3600" />
+                <label for="searchTime">時間</label>
+                <input id="searchTime" type="time" />
               </div>
             </div>
           </div>
@@ -539,9 +547,18 @@
           withDatetimeBtn.classList.add("active");
           nowBtn.classList.remove("active");
           datetimePanel.classList.remove("hidden");
+          localStorage.setItem("ramen-location-mode", "datetime");
+        });
+
+        nowBtn.addEventListener("click", () => {
+          localStorage.setItem("ramen-location-mode", "now");
         });
 
         initializeDatetimeInputs();
+        const savedMode = localStorage.getItem("ramen-location-mode");
+        if (savedMode === "datetime") {
+          withDatetimeBtn.click();
+        }
       }
 
       async function getCurrentPosition() {
@@ -588,18 +605,14 @@
               longitude: lng,
             },
           ]);
-
-          document.getElementById("overlay").classList.add("show");
-          setTimeout(() => {
-            if (liff.isInClient()) {
-              liff.closeWindow();
-            }
-          }, 900);
+          if (liff.isInClient()) {
+            liff.closeWindow();
+          }
         } catch (error) {
           alert(
             `位置情報の送信に失敗しました。通信状況をご確認の上、再度お試しください。\n${error.message || error}`,
           );
-          saveBtn.innerText = "検索する";
+          saveBtn.innerText = "地図を出して検索する";
           saveBtn.disabled = false;
         }
       }
@@ -622,8 +635,23 @@
         maxDateObj.setDate(maxDateObj.getDate() + 14);
         dateInput.min = minDate;
         dateInput.max = formatDateJst(maxDateObj);
-        dateInput.value = minDate;
-        timeInput.value = `${String(roundedHour.getHours()).padStart(2, "0")}:00`;
+        const storedDate = localStorage.getItem("ramen-search-date");
+        const storedTime = localStorage.getItem("ramen-search-time");
+        dateInput.value =
+          storedDate && storedDate >= dateInput.min && storedDate <= dateInput.max
+            ? storedDate
+            : minDate;
+        timeInput.value =
+          storedTime && /^\d{2}:\d{2}$/.test(storedTime)
+            ? storedTime
+            : `${String(roundedHour.getHours()).padStart(2, "0")}:00`;
+
+        dateInput.addEventListener("change", () => {
+          localStorage.setItem("ramen-search-date", dateInput.value);
+        });
+        timeInput.addEventListener("change", () => {
+          localStorage.setItem("ramen-search-time", timeInput.value);
+        });
       }
 
       function formatDateJst(dateObj) {
