@@ -1,10 +1,13 @@
 import asyncio
 import logging
+from datetime import datetime
 
 from app.db.user_pref_repo import get_user_weights
 from app.services.ai_summary import extract_ramen_categories, summarize_reviews_30
 from app.services.places import (
+    get_place_opening_hours,
     get_place_reviews,
+    is_open_at_jst,
     nearby_result_to_items,
     search_nearby,
 )
@@ -26,6 +29,7 @@ async def search_ramen_items(
     line_user_id: str | None = None,
     offset: int = 0,
     page_size: int = 10,
+    target_datetime_jst: datetime | None = None,
 ) -> tuple[list[dict[str, object]], bool, bool, int | None]:
     q = "ラーメン"
     had_error = False
@@ -72,6 +76,16 @@ async def search_ramen_items(
     if not items:
         return [], had_error, False, used_radius
 
+    if target_datetime_jst is not None:
+        items = await filter_items_open_at_datetime(items, target_datetime_jst)
+    else:
+        open_now_items = [item for item in items if item.get("open_now") is True]
+        if open_now_items:
+            items = open_now_items
+
+    if not items:
+        return [], had_error, False, used_radius
+
     # NOTE:
     # Preference ranking depends on extracted ramen categories.
     # Enrich all candidates before sorting so "中毒" etc. are reflected.
@@ -83,6 +97,47 @@ async def search_ramen_items(
     has_more = offset + page_size < len(ranked_items)
 
     return page_items, had_error, has_more, used_radius
+
+
+async def filter_items_open_at_datetime(
+    items: list[dict[str, object]],
+    target_datetime_jst: datetime,
+) -> list[dict[str, object]]:
+    semaphore = asyncio.Semaphore(_ENRICH_CONCURRENCY)
+
+    async def _check_open(item: dict[str, object]) -> bool:
+        place_id_value = item.get("place_id")
+        if not isinstance(place_id_value, str) or not place_id_value:
+            return False
+        async with semaphore:
+            try:
+                details = await asyncio.wait_for(
+                    get_place_opening_hours(place_id_value),
+                    timeout=_PER_ITEM_TIMEOUT_SEC,
+                )
+            except Exception as e:
+                logger.warning(
+                    "get_place_opening_hours skipped place_id=%s: %s",
+                    place_id_value,
+                    e,
+                )
+                return False
+
+        periods = details.get("periods")
+        if not isinstance(periods, list):
+            return False
+
+        is_open = is_open_at_jst(periods, target_datetime_jst)
+        return bool(is_open)
+
+    results = await asyncio.gather(*[_check_open(item) for item in items], return_exceptions=True)
+    filtered: list[dict[str, object]] = []
+    for item, result in zip(items, results):
+        if isinstance(result, Exception):
+            continue
+        if result:
+            filtered.append(item)
+    return filtered
 
 
 async def _enrich_item(

@@ -1,5 +1,6 @@
 import httpx
 import math
+from datetime import datetime, timedelta
 from app.config import GOOGLE_PLACES_API_KEY, GOOGLE_NEARBY_URL
 
 GOOGLE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -114,6 +115,97 @@ async def get_place_reviews(place_id: str) -> dict:
         ],
         "editorial_summary": editorial_summary,
     }
+
+
+async def get_place_opening_hours(place_id: str) -> dict[str, object]:
+    if not GOOGLE_PLACES_API_KEY:
+        raise PlacesUpstreamError("CONFIG_ERROR", "PLACES_API_KEY is missing")
+
+    params = {
+        "place_id": place_id,
+        "fields": "opening_hours",
+        "language": "ja",
+        "key": GOOGLE_PLACES_API_KEY,
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(GOOGLE_DETAILS_URL, params=params)
+        r.raise_for_status()
+        data = r.json()
+
+    result = data.get("result", {}) or {}
+    opening_hours = result.get("opening_hours") or {}
+    return {
+        "periods": opening_hours.get("periods") or [],
+    }
+
+
+def is_open_at_jst(periods: list[dict], target_dt_jst: datetime) -> bool | None:
+    if not periods:
+        return None
+
+    sunday_offset = (target_dt_jst.weekday() + 1) % 7
+    week_start_sunday = (target_dt_jst - timedelta(days=sunday_offset)).date()
+
+    for period in periods:
+        open_info = period.get("open") or {}
+        close_info = period.get("close") or {}
+        open_day = open_info.get("day")
+        open_time = open_info.get("time")
+
+        if open_day is None or not isinstance(open_time, str) or len(open_time) != 4:
+            continue
+
+        try:
+            open_hour = int(open_time[:2])
+            open_minute = int(open_time[2:])
+            open_day_int = int(open_day)
+        except (TypeError, ValueError):
+            continue
+
+        open_date = week_start_sunday + timedelta(days=open_day_int)
+        open_dt_base = datetime(
+            open_date.year,
+            open_date.month,
+            open_date.day,
+            open_hour,
+            open_minute,
+            tzinfo=target_dt_jst.tzinfo,
+        )
+
+        if close_info:
+            close_day = close_info.get("day")
+            close_time = close_info.get("time")
+            if close_day is None or not isinstance(close_time, str) or len(close_time) != 4:
+                continue
+            try:
+                close_hour = int(close_time[:2])
+                close_minute = int(close_time[2:])
+                close_day_int = int(close_day)
+            except (TypeError, ValueError):
+                continue
+            close_date = week_start_sunday + timedelta(days=close_day_int)
+            close_dt_base = datetime(
+                close_date.year,
+                close_date.month,
+                close_date.day,
+                close_hour,
+                close_minute,
+                tzinfo=target_dt_jst.tzinfo,
+            )
+        else:
+            close_dt_base = open_dt_base + timedelta(days=1)
+
+        for week_shift in (-7, 0, 7):
+            open_dt = open_dt_base + timedelta(days=week_shift)
+            close_dt = close_dt_base + timedelta(days=week_shift)
+            if close_dt <= open_dt:
+                close_dt += timedelta(days=7)
+
+            if open_dt <= target_dt_jst < close_dt:
+                return True
+
+    return False
 
 
 def _flat_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
