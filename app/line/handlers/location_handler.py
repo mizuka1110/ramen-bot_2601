@@ -82,23 +82,25 @@ async def handle_location_message(
         clear_user_state(user_id)
         return
 
-    datetime_notice_text: str | None = None
+    datetime_notice_message: dict | None = None
     if selected_datetime:
         try:
             target = datetime.fromisoformat(selected_datetime)
             timestamp_label = f"{target.month}月{target.day}日{target.hour}時{target.minute:02d}分"
         except ValueError:
             timestamp_label = selected_datetime
-        datetime_notice_text = (
-            f"{timestamp_label}の情報です。実際とは相違がある可能性があります。"
-        )
+        datetime_notice_message = {
+            "type": "text",
+            "text": f"※ {timestamp_label}時点の営業情報です。最新状況と異なる場合があります。",
+        }
 
     flex = build_flex_carousel(
         items,
         show_business_hours=selected_datetime is not None,
-        datetime_notice_text=datetime_notice_text,
     )
     messages: list[dict] = []
+    if datetime_notice_message:
+        messages.append(datetime_notice_message)
     messages.append(flex)
     if used_radius is not None and used_radius >= 2000:
         messages.append(build_search_radius_message(used_radius))
