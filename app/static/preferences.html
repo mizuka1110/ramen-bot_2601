@@ -147,6 +147,61 @@
         color: #3c3c43;
       }
 
+      .location-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+      }
+
+      .location-actions button {
+        flex: 1;
+        min-height: 42px;
+        border-radius: 12px;
+        border: 1px solid #e6e6ea;
+        background: #ffffff;
+        color: #444;
+        font-weight: 700;
+      }
+
+      .location-actions button.active {
+        border-color: #ff8c3a;
+        color: #ff8c3a;
+        background: #fff6ef;
+      }
+
+      .datetime-panel {
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid #eee;
+      }
+
+      .datetime-panel.hidden {
+        display: none;
+      }
+
+      .datetime-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .datetime-grid label {
+        display: block;
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 4px;
+      }
+
+      .datetime-grid input {
+        width: 100%;
+        min-height: 38px;
+        border-radius: 10px;
+        border: 1px solid #e6e6ea;
+        padding: 8px;
+      }
+
       .spinner {
         display: inline-block;
         width: 18px;
@@ -442,7 +497,51 @@
         });
 
         const saveBtn = document.getElementById("saveBtn");
-        saveBtn.innerText = "現在地を送信する";
+        saveBtn.innerText = "検索する";
+
+        const container = document.querySelector(".container");
+        if (!container) return;
+
+        const zone = document.createElement("div");
+        zone.innerHTML = `
+          <div class="location-actions">
+            <button id="searchNowBtn" class="active" type="button">今すぐ</button>
+            <button id="searchWithDatetimeBtn" type="button">日時指定</button>
+          </div>
+          <div id="datetimePanel" class="datetime-panel hidden">
+            <div class="datetime-grid">
+              <div>
+                <label for="searchDate">日付（JST）</label>
+                <input id="searchDate" type="date" />
+              </div>
+              <div>
+                <label for="searchTime">時間（1時間刻み）</label>
+                <input id="searchTime" type="time" step="3600" />
+              </div>
+            </div>
+          </div>
+        `;
+        saveBtn.parentNode?.insertBefore(zone, saveBtn);
+
+        const nowBtn = document.getElementById("searchNowBtn");
+        const withDatetimeBtn = document.getElementById("searchWithDatetimeBtn");
+        const datetimePanel = document.getElementById("datetimePanel");
+
+        if (!nowBtn || !withDatetimeBtn || !datetimePanel) return;
+
+        nowBtn.addEventListener("click", () => {
+          nowBtn.classList.add("active");
+          withDatetimeBtn.classList.remove("active");
+          datetimePanel.classList.add("hidden");
+        });
+
+        withDatetimeBtn.addEventListener("click", () => {
+          withDatetimeBtn.classList.add("active");
+          nowBtn.classList.remove("active");
+          datetimePanel.classList.remove("hidden");
+        });
+
+        initializeDatetimeInputs();
       }
 
       async function getCurrentPosition() {
@@ -458,7 +557,7 @@
       async function sendCurrentLocation() {
         const saveBtn = document.getElementById("saveBtn");
         saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="spinner"></span>位置情報を取得中';
+        saveBtn.innerHTML = '<span class="spinner"></span>検索中';
         try {
           if (!navigator.geolocation) {
             throw new Error("この端末は位置情報取得に対応していません。");
@@ -468,11 +567,23 @@
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
 
+          const nowMode = document
+            .getElementById("searchNowBtn")
+            ?.classList.contains("active");
+          const payload = {
+            timezone: "Asia/Tokyo",
+            datetime: "",
+          };
+          if (!nowMode) {
+            const dt = collectSelectedDatetimeIsoJst();
+            if (dt) payload.datetime = dt;
+          }
+
           await liff.sendMessages([
             {
               type: "location",
-              title: "現在地",
-              address: `緯度:${lat.toFixed(6)} 経度:${lng.toFixed(6)}`,
+              title: "ラーメン検索",
+              address: `datetime=${encodeURIComponent(payload.datetime)}&timezone=${encodeURIComponent(payload.timezone)}`,
               latitude: lat,
               longitude: lng,
             },
@@ -488,9 +599,47 @@
           alert(
             `位置情報の送信に失敗しました。通信状況をご確認の上、再度お試しください。\n${error.message || error}`,
           );
-          saveBtn.innerText = "現在地を送信する";
+          saveBtn.innerText = "検索する";
           saveBtn.disabled = false;
         }
+      }
+
+      function initializeDatetimeInputs() {
+        const dateInput = document.getElementById("searchDate");
+        const timeInput = document.getElementById("searchTime");
+        if (!dateInput || !timeInput) return;
+
+        const nowJst = new Date(
+          new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }),
+        );
+        const roundedHour = new Date(nowJst);
+        if (roundedHour.getMinutes() >= 30) {
+          roundedHour.setHours(roundedHour.getHours() + 1);
+        }
+        roundedHour.setMinutes(0, 0, 0);
+        const minDate = formatDateJst(nowJst);
+        const maxDateObj = new Date(nowJst);
+        maxDateObj.setDate(maxDateObj.getDate() + 14);
+        dateInput.min = minDate;
+        dateInput.max = formatDateJst(maxDateObj);
+        dateInput.value = minDate;
+        timeInput.value = `${String(roundedHour.getHours()).padStart(2, "0")}:00`;
+      }
+
+      function formatDateJst(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const d = String(dateObj.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+
+      function collectSelectedDatetimeIsoJst() {
+        const dateInput = document.getElementById("searchDate");
+        const timeInput = document.getElementById("searchTime");
+        if (!dateInput || !timeInput || !dateInput.value || !timeInput.value) {
+          return null;
+        }
+        return `${dateInput.value}T${timeInput.value}:00+09:00`;
       }
 
       function setupSegments() {

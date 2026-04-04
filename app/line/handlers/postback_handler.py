@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.line.messages import (
     build_flex_carousel,
     build_okawari_message,
@@ -45,6 +47,13 @@ async def handle_postback(
         lat = session.get("lat")
         lng = session.get("lng")
         offset = session.get("next_offset")
+        target_datetime_raw = session.get("target_datetime_jst")
+        target_datetime_jst = None
+        if isinstance(target_datetime_raw, str):
+            try:
+                target_datetime_jst = datetime.fromisoformat(target_datetime_raw)
+            except ValueError:
+                target_datetime_jst = None
         if not isinstance(lat, float) or not isinstance(lng, float) or not isinstance(offset, int):
             clear_search_session(user_id)
             await line_reply(
@@ -59,6 +68,7 @@ async def handle_postback(
             line_user_id=user_id,
             offset=offset,
             page_size=10,
+            target_datetime_jst=target_datetime_jst,
         )
         if not items:
             if had_error:
@@ -77,7 +87,13 @@ async def handle_postback(
         messages: list[dict] = [build_flex_carousel(items)]
         next_offset = offset + 10
         if has_more:
-            set_search_session(user_id, lat=lat, lng=lng, next_offset=next_offset)
+            set_search_session(
+                user_id,
+                lat=lat,
+                lng=lng,
+                next_offset=next_offset,
+                target_datetime_jst=target_datetime_jst.isoformat() if target_datetime_jst else None,
+            )
             messages.append(build_okawari_message(next_offset=next_offset))
         else:
             clear_search_session(user_id)
