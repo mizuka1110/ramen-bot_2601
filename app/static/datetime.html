@@ -14,7 +14,7 @@
         color: #222;
       }
       .card {
-        width: min(520px, 100%);
+        width: min(520px, 70%);
         margin: 0 auto;
         background: #fff;
         border-radius: 12px;
@@ -31,8 +31,10 @@
       }
       input,
       button {
-        width: 100%;
+        width: min(360px, 70%);
         box-sizing: border-box;
+        margin-left: auto;
+        margin-right: auto;
       }
       input {
         display: block;
@@ -71,7 +73,7 @@
       <h1>日時を指定</h1>
       <p>設定した日時の情報を検索できます。</p>
       <input id="dt" type="datetime-local" />
-      <button id="send" type="button">LINEに送る</button>
+      <button id="send" type="button">この日時に設定する</button>
       <p id="status" class="note"></p>
     </div>
     <script>
