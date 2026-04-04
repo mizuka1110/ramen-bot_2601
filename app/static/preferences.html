@@ -123,6 +123,18 @@
         opacity: 0.9;
       }
 
+      .map-picker-secondary {
+        width: 100%;
+        margin-top: 10px;
+        min-height: 42px;
+        border-radius: 14px;
+        border: 1px solid #ffd8bf;
+        background: #fff6ef;
+        color: #ff8c3a;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
       .close {
         width: 100%;
         margin-top: 10px;
@@ -167,10 +179,6 @@
         border-color: #ff8c3a;
         color: #ff8c3a;
         background: #fff6ef;
-      }
-
-      .location-actions .map-picker {
-        grid-column: 1 / -1;
       }
 
       .datetime-panel {
@@ -531,7 +539,6 @@
           <div class="location-actions">
             <button id="searchNowBtn" class="active" type="button">今すぐ</button>
             <button id="searchWithDatetimeBtn" type="button">日時指定</button>
-            <button id="openMapPickerBtn" class="map-picker" type="button">地図から選ぶ</button>
           </div>
           <div id="datetimePanel" class="datetime-panel hidden">
             <div class="datetime-grid">
@@ -547,6 +554,13 @@
           </div>
         `;
         saveBtn.parentNode?.insertBefore(zone, saveBtn);
+
+        const mapPickerBtn = document.createElement("button");
+        mapPickerBtn.id = "openMapPickerBtn";
+        mapPickerBtn.className = "map-picker-secondary";
+        mapPickerBtn.type = "button";
+        mapPickerBtn.textContent = "地図から選ぶ（現在地を送信）";
+        saveBtn.insertAdjacentElement("afterend", mapPickerBtn);
 
         const nowBtn = document.getElementById("searchNowBtn");
         const withDatetimeBtn = document.getElementById("searchWithDatetimeBtn");
@@ -593,10 +607,20 @@
         });
       }
 
-      async function sendCurrentLocation() {
+      async function sendCurrentLocation(triggerSource = "save") {
         const saveBtn = document.getElementById("saveBtn");
+        const mapBtn = document.getElementById("openMapPickerBtn");
+        const activeBtn = triggerSource === "map" ? mapBtn : saveBtn;
+        const defaultLabel =
+          triggerSource === "map"
+            ? "地図から選ぶ（現在地を送信）"
+            : "現在地を送信する";
+
+        if (!saveBtn || !activeBtn) return;
+
         saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="spinner"></span>検索中';
+        if (mapBtn) mapBtn.disabled = true;
+        activeBtn.innerHTML = '<span class="spinner"></span>検索中';
         try {
           if (!navigator.geolocation) {
             throw new Error("この端末は位置情報取得に対応していません。");
@@ -632,29 +656,17 @@
           }
         } catch (error) {
           alert(
-            `位置情報の送信に失敗しました。通信状況をご確認の上、再度お試しください。\n${error.message || error}`,
+            `位置情報の送信に失敗しました。通信状況をご確認の上、再度お試しください。
+${error.message || error}`,
           );
-          saveBtn.innerText = "現在地を送信する";
+          activeBtn.innerText = defaultLabel;
           saveBtn.disabled = false;
+          if (mapBtn) mapBtn.disabled = false;
         }
       }
 
-      async function openLineLocationPicker() {
-        const lineLocationPickerUrl = "line://nv/location";
-        try {
-          if (window.liff && liff.isInClient()) {
-            await liff.openWindow({
-              url: lineLocationPickerUrl,
-              external: false,
-            });
-            return;
-          }
-          window.location.href = lineLocationPickerUrl;
-        } catch (error) {
-          alert(
-            `地図の起動に失敗しました。LINEトーク画面の「＋」→「位置情報」から送信してください。\n${error.message || error}`,
-          );
-        }
+      function openLineLocationPicker() {
+        sendCurrentLocation("map");
       }
 
       function initializeDatetimeInputs() {
