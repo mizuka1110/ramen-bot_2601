@@ -368,6 +368,22 @@
 
     <script>
       let userId = null;
+      const params = new URLSearchParams(window.location.search);
+      const liffStateRaw = params.get("liff.state") || "";
+      const liffState = (() => {
+        try {
+          return decodeURIComponent(liffStateRaw);
+        } catch (_) {
+          return liffStateRaw;
+        }
+      })();
+      const pageMode =
+        params.get("mode") === "location" ||
+        liffState.includes("mode=location") ||
+        /\/location(?:$|\?)/.test(liffState) ||
+        /\/preferences\/location(?:$|\?)/.test(window.location.pathname)
+          ? "location"
+          : "preferences";
 
       const STRONG_CATEGORIES = new Set(["あっさり", "こってり", "辛い"]);
 
@@ -401,12 +417,79 @@
           const profile = await liff.getProfile();
           userId = profile.userId;
 
+          if (pageMode === "location") {
+            prepareLocationModeUI();
+            return;
+          }
+
           await loadPreferences();
         } catch (error) {
           document.body.insertAdjacentHTML(
             "afterbegin",
             `<div style="background:red;color:white;padding:10px;word-break:break-all">${error}</div>`,
           );
+        }
+      }
+
+      function prepareLocationModeUI() {
+        const titleEl = document.querySelector("h1");
+        const subEl = document.querySelector(".sub");
+        if (titleEl) titleEl.textContent = "現在地を送信";
+        if (subEl) subEl.textContent = "下のボタンで現在地をLINEトークに送ります。";
+
+        document.querySelectorAll(".row").forEach((row) => {
+          row.style.display = "none";
+        });
+
+        const saveBtn = document.getElementById("saveBtn");
+        saveBtn.innerText = "現在地を送信する";
+      }
+
+      async function getCurrentPosition() {
+        return await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0,
+          });
+        });
+      }
+
+      async function sendCurrentLocation() {
+        const saveBtn = document.getElementById("saveBtn");
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner"></span>位置情報を取得中';
+        try {
+          if (!navigator.geolocation) {
+            throw new Error("この端末は位置情報取得に対応していません。");
+          }
+
+          const pos = await getCurrentPosition();
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+
+          await liff.sendMessages([
+            {
+              type: "location",
+              title: "現在地",
+              address: `緯度:${lat.toFixed(6)} 経度:${lng.toFixed(6)}`,
+              latitude: lat,
+              longitude: lng,
+            },
+          ]);
+
+          document.getElementById("overlay").classList.add("show");
+          setTimeout(() => {
+            if (liff.isInClient()) {
+              liff.closeWindow();
+            }
+          }, 900);
+        } catch (error) {
+          alert(
+            `位置情報の送信に失敗しました。通信状況をご確認の上、再度お試しください。\n${error.message || error}`,
+          );
+          saveBtn.innerText = "現在地を送信する";
+          saveBtn.disabled = false;
         }
       }
 
@@ -582,9 +665,13 @@
         }
       }
 
-      document
-        .getElementById("saveBtn")
-        .addEventListener("click", savePreferences);
+      document.getElementById("saveBtn").addEventListener("click", () => {
+        if (pageMode === "location") {
+          sendCurrentLocation();
+          return;
+        }
+        savePreferences();
+      });
 
       document.getElementById("closeBtn").addEventListener("click", () => {
         if (liff.isInClient()) {
