@@ -1,4 +1,5 @@
 from app.services.line_client import line_reply
+from app.config import PUBLIC_BASE_URL
 
 
 async def handle_text_message(
@@ -12,6 +13,7 @@ async def handle_text_message(
     text = str(message.get("text", "")).strip()
 
     liff_base_url = "https://liff.line.me/2009360861-I31kIVzt"
+    search_url = f"{PUBLIC_BASE_URL.rstrip('/')}/search" if PUBLIC_BASE_URL else "/search"
 
     if "好み" in text:
         preferences_url = liff_base_url
@@ -70,7 +72,6 @@ async def handle_text_message(
         return
 
     if "ラーメン" in text:
-        location_liff_url = f"{liff_base_url}?mode=location"
         await line_reply(
             reply_token,
             [
@@ -113,7 +114,7 @@ async def handle_text_message(
                                     "action": {
                                         "type": "uri",
                                         "label": "検索メニューを開く",
-                                        "uri": location_liff_url,
+                                        "uri": search_url,
                                     },
                                 }
                             ],

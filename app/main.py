@@ -188,9 +188,14 @@ async def preferences_page():
     return FileResponse("app/static/preferences.html")
 
 
-@app.get("/preferences/location")
-async def preferences_location_page():
-    return FileResponse("app/static/preferences.html")
+@app.get("/location")
+async def location_page():
+    return FileResponse("app/static/location.html")
+
+
+@app.get("/search")
+async def search_page():
+    return FileResponse("app/static/search.html")
 
 ##好み登録API
 
