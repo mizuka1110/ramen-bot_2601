@@ -29,26 +29,45 @@
         margin: 0 0 16px;
         color: #555;
       }
-      input,
-      button {
-        width: min(360px, 70%);
+      button,
+      .picker-row {
+        width: min(460px, 100%);
         box-sizing: border-box;
         margin-left: auto;
         margin-right: auto;
       }
-      input {
+      button {
         display: block;
-        max-width: 100%;
-        min-height: 44px;
-        padding: 10px 12px;
-        padding-right: 42px;
-        font-size: 16px;
+      }
+      .picker-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
         margin-bottom: 12px;
+      }
+      .picker-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .picker-col span {
+        font-size: 12px;
+        color: #666;
+      }
+      select {
+        width: 100%;
+        min-height: 132px;
+        padding: 8px 4px;
+        font-size: 15px;
+        text-align: center;
         border: 1px solid #ddd;
         border-radius: 8px;
         background: #fff;
         color: #222;
-        overflow: hidden;
+      }
+      option {
+        padding: 4px;
       }
       button {
         padding: 12px;
@@ -72,23 +91,84 @@
     <div class="card">
       <h1>日時を指定</h1>
       <p>設定した日時の情報を検索できます。</p>
-      <input id="dt" type="datetime-local" />
+      <div class="picker-row">
+        <label class="picker-col">
+          <span>年</span>
+          <select id="year" size="5"></select>
+        </label>
+        <label class="picker-col">
+          <span>月</span>
+          <select id="month" size="5"></select>
+        </label>
+        <label class="picker-col">
+          <span>日</span>
+          <select id="day" size="5"></select>
+        </label>
+        <label class="picker-col">
+          <span>時</span>
+          <select id="hour" size="5"></select>
+        </label>
+        <label class="picker-col">
+          <span>分</span>
+          <select id="minute" size="5"></select>
+        </label>
+      </div>
       <button id="send" type="button">この日時に設定する</button>
       <p id="status" class="note"></p>
     </div>
     <script>
-      const dt = document.getElementById("dt");
+      const year = document.getElementById("year");
+      const month = document.getElementById("month");
+      const day = document.getElementById("day");
+      const hour = document.getElementById("hour");
+      const minute = document.getElementById("minute");
       const send = document.getElementById("send");
       const status = document.getElementById("status");
       const DEFAULT_LIFF_ID = "2009360861-udWtvLeU";
       const liffId =
         new URLSearchParams(window.location.search).get("liffId") || DEFAULT_LIFF_ID;
 
+      const pad2 = (value) => String(value).padStart(2, "0");
+      const buildOptions = (target, start, end, suffix = "") => {
+        target.innerHTML = "";
+        for (let n = start; n <= end; n++) {
+          const option = document.createElement("option");
+          option.value = String(n);
+          option.textContent = `${n}${suffix}`;
+          target.appendChild(option);
+        }
+      };
+
+      const refreshDays = () => {
+        const y = Number(year.value);
+        const m = Number(month.value);
+        const previous = Number(day.value) || 1;
+        const maxDay = new Date(y, m, 0).getDate();
+        day.innerHTML = "";
+        for (let d = 1; d <= maxDay; d++) {
+          const option = document.createElement("option");
+          option.value = String(d);
+          option.textContent = `${d}日`;
+          day.appendChild(option);
+        }
+        day.value = String(Math.min(previous, maxDay));
+      };
+
       const now = new Date();
-      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
-      dt.value = local;
+      buildOptions(year, now.getFullYear() - 1, now.getFullYear() + 2, "年");
+      buildOptions(month, 1, 12, "月");
+      buildOptions(hour, 0, 23, "時");
+      buildOptions(minute, 0, 59, "分");
+
+      year.value = String(now.getFullYear());
+      month.value = String(now.getMonth() + 1);
+      refreshDays();
+      day.value = String(now.getDate());
+      hour.value = String(now.getHours());
+      minute.value = String(now.getMinutes());
+
+      year.addEventListener("change", refreshDays);
+      month.addEventListener("change", refreshDays);
 
       const setStatus = (text) => {
         status.textContent = text;
@@ -103,9 +183,16 @@
           }
 
           send.addEventListener("click", async () => {
-            if (!dt.value) return;
+            const y = Number(year.value);
+            const m = Number(month.value);
+            const d = Number(day.value);
+            const h = Number(hour.value);
+            const min = Number(minute.value);
+            if (!y || !m || !d) return;
 
-            const text = `日時指定:${dt.value}`;
+            const formatted = `${y}-${pad2(m)}-${pad2(d)}T${pad2(h)}:${pad2(min)}`;
+
+            const text = `日時指定:${formatted}`;
             send.disabled = true;
 
             try {
