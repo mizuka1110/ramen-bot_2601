@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>日時指定</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -34,10 +35,16 @@
         box-sizing: border-box;
       }
       input {
+        display: block;
+        max-width: 100%;
+        min-height: 44px;
         padding: 10px;
         margin-bottom: 12px;
         border: 1px solid #ddd;
         border-radius: 8px;
+        background: #fff;
+        color: #222;
+        overflow: hidden;
       }
       button {
         padding: 12px;
@@ -47,18 +54,29 @@
         color: white;
         font-weight: 700;
       }
+      button:disabled {
+        opacity: 0.6;
+      }
+      .note {
+        margin-top: 12px;
+        font-size: 12px;
+        color: #888;
+      }
     </style>
   </head>
   <body>
     <div class="card">
       <h1>日時を指定</h1>
-      <p>送信するとLINEに「日時指定:YYYY-MM-DDTHH:mm」を送れます。</p>
+      <p>行く予定の日の情報を確認できます。</p>
       <input id="dt" type="datetime-local" />
       <button id="send" type="button">LINEに送る</button>
+      <p id="status" class="note"></p>
     </div>
     <script>
       const dt = document.getElementById("dt");
       const send = document.getElementById("send");
+      const status = document.getElementById("status");
+      const LIFF_ID = new URLSearchParams(window.location.search).get("liffId");
 
       const now = new Date();
       const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -66,11 +84,50 @@
         .slice(0, 16);
       dt.value = local;
 
-      send.addEventListener("click", () => {
+      const setStatus = (text) => {
+        status.textContent = text;
+      };
+
+      const initLiff = async () => {
+        try {
+          if (!LIFF_ID) {
+            setStatus("LIFF ID未設定のため、通常送信モードで動作します。");
+            return;
+          }
+          await liff.init({ liffId: LIFF_ID });
+          if (!liff.isLoggedIn()) {
+            liff.login();
+            return;
+          }
+        } catch (error) {
+          console.error(error);
+          setStatus("LIFFの初期化に失敗しました。URL設定を確認してください。");
+        }
+      };
+
+      send.addEventListener("click", async () => {
         if (!dt.value) return;
+
         const text = `日時指定:${dt.value}`;
-        window.location.href = `line://msg/text/${encodeURIComponent(text)}`;
+        send.disabled = true;
+
+        try {
+          if (window.liff && liff.isInClient()) {
+            await liff.sendMessages([{ type: "text", text }]);
+            liff.closeWindow();
+            return;
+          }
+
+          window.location.href = `line://msg/text/${encodeURIComponent(text)}`;
+        } catch (error) {
+          console.error(error);
+          setStatus("送信に失敗しました。もう一度お試しください。");
+        } finally {
+          send.disabled = false;
+        }
       });
+
+      initLiff();
     </script>
   </body>
 </html>
