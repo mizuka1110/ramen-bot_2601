@@ -323,7 +323,7 @@ def build_search_radius_message(radius_m: int) -> dict:
     }
 
 
-def shop_to_bubble(item: dict) -> dict:
+def shop_to_bubble(item: dict, show_business_hours: bool = False) -> dict:
     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
     label_text, label_bg = _open_label(item.get("open_now"))
 
@@ -339,16 +339,10 @@ def shop_to_bubble(item: dict) -> dict:
         if rating_count is not None:
             rating_text += f"（{rating_count}）"
 
-    lat = item.get("lat")
-    lng = item.get("lng")
+    map_url = place_url
 
-    map_url = (
-        f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
-        if lat is not None and lng is not None
-        else (item.get("maps_url") or "https://www.google.com/maps")
-    )
-
-    body_contents = [
+    business_hours_text = item.get("business_hours_text")
+    status_contents: list[dict] = [
         {
             "type": "box",
             "layout": "horizontal",
@@ -373,6 +367,26 @@ def shop_to_bubble(item: dict) -> dict:
             "paddingEnd": "10px",
             "flex": 0,
             "maxWidth": "58px",
+        },
+    ]
+    if show_business_hours and isinstance(business_hours_text, str) and business_hours_text.strip():
+        status_contents.append(
+            {
+                "type": "text",
+                "text": business_hours_text,
+                "size": "xs",
+                "color": "#6B7280",
+                "flex": 0,
+                "margin": "sm",
+            }
+        )
+
+    body_contents = [
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "alignItems": "center",
+            "contents": status_contents,
         },
         {
             "type": "text",
@@ -477,9 +491,16 @@ def shop_to_bubble(item: dict) -> dict:
     }
 
 
-def build_flex_carousel(items: list[dict]) -> dict:
+def build_flex_carousel(items: list[dict], show_business_hours: bool = False) -> dict:
     # 念のため None 混入を防ぐ（shop_to_bubbleは基本None返さない想定）
-    bubbles = [b for b in (shop_to_bubble(x) for x in (items or [])[:10]) if b]
+    bubbles = [
+        b
+        for b in (
+            shop_to_bubble(x, show_business_hours=show_business_hours)
+            for x in (items or [])[:10]
+        )
+        if b
+    ]
 
     return {
         "type": "flex",

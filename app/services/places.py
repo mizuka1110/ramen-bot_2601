@@ -88,7 +88,7 @@ async def get_place_reviews(place_id: str) -> dict:
 
     params = {
         "place_id": place_id,
-        "fields": "reviews,editorial_summary",
+        "fields": "reviews,editorial_summary,opening_hours",
         "language": "ja",
         "key": GOOGLE_PLACES_API_KEY,
     }
@@ -102,6 +102,7 @@ async def get_place_reviews(place_id: str) -> dict:
 
     reviews = result.get("reviews", []) or []
     editorial_summary = (result.get("editorial_summary") or {}).get("overview")
+    opening_hours = result.get("opening_hours") or {}
 
     return {
         "reviews": [
@@ -113,6 +114,7 @@ async def get_place_reviews(place_id: str) -> dict:
             if rev.get("text")
         ],
         "editorial_summary": editorial_summary,
+        "opening_hours": opening_hours,
     }
 
 

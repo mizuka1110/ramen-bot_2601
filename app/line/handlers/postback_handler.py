@@ -60,6 +60,7 @@ async def handle_postback(
             line_user_id=user_id,
             offset=offset,
             page_size=10,
+            search_datetime=search_datetime if isinstance(search_datetime, str) else None,
         )
         if not items:
             if had_error:
@@ -75,7 +76,12 @@ async def handle_postback(
             clear_search_session(user_id)
             return
 
-        messages: list[dict] = [build_flex_carousel(items)]
+        messages: list[dict] = [
+            build_flex_carousel(
+                items,
+                show_business_hours=isinstance(search_datetime, str) and bool(search_datetime),
+            )
+        ]
         next_offset = offset + 10
         if has_more:
             set_search_session(
