@@ -70,7 +70,7 @@ async def handle_text_message(
         return
 
     if "ラーメン" in text:
-        location_liff_url = f"{liff_base_url}/location"
+        location_liff_url = f"{liff_base_url}?mode=location"
         await line_reply(
             reply_token,
             [
