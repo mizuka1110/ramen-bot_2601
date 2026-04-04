@@ -112,7 +112,7 @@ async def handle_text_message(
                                     "color": "#ff8c3a",
                                     "action": {
                                         "type": "uri",
-                                        "label": "地図を開いて検索する",
+                                        "label": "現在地を送信する",
                                         "uri": location_liff_url,
                                     },
                                 }
