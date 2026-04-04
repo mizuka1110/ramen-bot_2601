@@ -16,10 +16,10 @@ async def handle_text_message(
 
     if "日時・場所を指定" in text:
         datetime_url = DATETIME_LIFF_URL
+        if not datetime_url and PUBLIC_BASE_URL:
+            datetime_url = f"{PUBLIC_BASE_URL}/static/datetime.html"
         if not datetime_url and DATETIME_LIFF_ID:
             datetime_url = f"https://liff.line.me/{DATETIME_LIFF_ID}"
-        if not datetime_url:
-            datetime_url = f"{PUBLIC_BASE_URL}/static/datetime.html"
         await line_reply(
             reply_token,
             [
@@ -41,7 +41,7 @@ async def handle_text_message(
                                 },
                                 {
                                     "type": "text",
-                                    "text": "行く予定日に設定した日時の情報を確認できます。",
+                                    "text": "設定した日時の情報を検索できます。",
                                     "wrap": True,
                                     "size": "sm",
                                     "color": "#666666",
