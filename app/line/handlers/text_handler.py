@@ -76,7 +76,7 @@ async def handle_text_message(
             [
                 {
                     "type": "flex",
-                    "altText": "現在地からラーメン検索",
+                    "altText": "ラーメンを検索する",
                     "contents": {
                         "type": "bubble",
                         "body": {
@@ -86,7 +86,7 @@ async def handle_text_message(
                             "contents": [
                                 {
                                     "type": "text",
-                                    "text": "現在地からラーメン検索",
+                                    "text": "ラーメンを検索する",
                                     "weight": "bold",
                                     "size": "lg",
                                 },
@@ -112,7 +112,7 @@ async def handle_text_message(
                                     "color": "#ff8c3a",
                                     "action": {
                                         "type": "uri",
-                                        "label": "位置送信を開く",
+                                        "label": "現在地を送信する",
                                         "uri": location_liff_url,
                                     },
                                 }
