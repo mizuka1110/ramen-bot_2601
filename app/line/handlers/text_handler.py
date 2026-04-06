@@ -27,7 +27,7 @@ async def handle_text_message(
             [
                 {
                     "type": "text",
-                    "text": "了解！\n\n下のボタンから検索地点を送ってね",
+                    "text": "今すぐ行けるラーメン屋さんを検索します。\n\n下のボタンから検索地点を送ってね",
                     "quickReply": {
                         "items": [
                             {
@@ -44,7 +44,7 @@ async def handle_text_message(
         )
         return
 
-    if "日時・場所を指定" in text:
+    if "日時・場所を指定" in text or "場所・日時を指定" in text:
         datetime_url = ""
         if DATETIME_LIFF_ID:
             datetime_url = f"https://liff.line.me/{DATETIME_LIFF_ID}"
@@ -132,7 +132,7 @@ async def handle_text_message(
             [
                 {
                     "type": "text",
-                    "text": "続いて、検索地点を送ってください📍",
+                    "text": "続いて、以下から検索したい地点を選んでください",
                     "quickReply": {
                         "items": [
                             {

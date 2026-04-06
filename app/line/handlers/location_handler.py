@@ -116,7 +116,7 @@ async def handle_location_message(
                             "type": "action",
                             "action": {
                                 "type": "location",
-                                "label": "地図を開く",
+                                "label": "別の地点で検索する",
                             },
                         }
                     ]

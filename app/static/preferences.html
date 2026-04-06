@@ -123,6 +123,24 @@
         opacity: 0.9;
       }
 
+      .reset {
+        display: block;
+        width: 92%;
+        margin: 0 auto 12px;
+        min-height: 38px;
+        padding: 10px 14px;
+        border: 1px solid #d5d5db;
+        border-radius: 12px;
+        background: #ffffff;
+        color: #666;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .reset:active {
+        opacity: 0.85;
+      }
+
       .close {
         width: 100%;
         margin-top: 10px;
@@ -241,6 +259,7 @@
         登録された好みをもとに検索結果を表示します。<br />
         設定なしでも保存、検索ができます。
       </p>
+      <button id="resetBtn" class="reset" type="button">選択をリセットする</button>
 
       <div class="row">
         <div class="label">こってり</div>
@@ -503,6 +522,12 @@
         });
       }
 
+      function resetSelections() {
+        document.querySelectorAll(".segment button.active").forEach((button) => {
+          button.classList.remove("active");
+        });
+      }
+
       async function savePreferences() {
         const saveBtn = document.getElementById("saveBtn");
         const weights = collectWeights();
@@ -585,6 +610,7 @@
       document
         .getElementById("saveBtn")
         .addEventListener("click", savePreferences);
+      document.getElementById("resetBtn").addEventListener("click", resetSelections);
 
       document.getElementById("closeBtn").addEventListener("click", () => {
         if (liff.isInClient()) {
