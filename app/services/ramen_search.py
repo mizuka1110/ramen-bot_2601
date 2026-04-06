@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 
 from app.db.user_pref_repo import get_user_weights
-from app.services.ai_summary import extract_ramen_categories, summarize_reviews_30
+from app.services.ai_summary import extract_ramen_category_mentions, summarize_reviews_30
 from app.services.places import (
     get_place_reviews,
     nearby_result_to_items,
@@ -75,8 +75,8 @@ async def search_ramen_items(
         return [], had_error, False, used_radius
 
     # NOTE:
-    # Preference ranking depends on extracted ramen categories.
-    # Enrich all candidates before sorting so "中毒" etc. are reflected.
+    # Preference ranking depends on extracted ramen category mentions.
+    # Enrich all candidates before sorting so preference weights are reflected.
     await enrich_items(items, search_datetime=search_datetime)
 
     weights = get_user_weights(line_user_id) if line_user_id else {}
@@ -114,7 +114,7 @@ async def _enrich_item(
     editorial_summary = detail.get("editorial_summary")
     opening_hours = detail.get("opening_hours") or {}
 
-    category_task = extract_ramen_categories(editorial_summary, reviews)
+    category_task = extract_ramen_category_mentions(editorial_summary, reviews)
     summary_task = summarize_reviews_30(reviews)
 
     categories_result, summary_result = await asyncio.gather(
@@ -124,10 +124,10 @@ async def _enrich_item(
     )
 
     if not isinstance(categories_result, Exception) and categories_result:
-        item["categories"] = categories_result
+        item["category_mentions"] = categories_result
     elif isinstance(categories_result, Exception):
         logger.warning(
-            "extract_ramen_categories skipped place_id=%s: %s",
+            "extract_ramen_category_mentions skipped place_id=%s: %s",
             place_id_value,
             categories_result,
         )

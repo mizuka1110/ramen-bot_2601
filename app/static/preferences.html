@@ -33,10 +33,19 @@
       }
 
       .sub {
-        margin: 0 0 20px;
-        text-align: center;
+        margin: 0;
+        text-align: left;
         font-size: 13px;
         color: #7a7a7a;
+        line-height: 1.5;
+      }
+
+      .sub-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin: 0 0 14px;
       }
 
       .row {
@@ -124,17 +133,16 @@
       }
 
       .reset {
-        display: block;
-        width: 92%;
-        margin: 0 auto 12px;
-        min-height: 38px;
-        padding: 10px 14px;
+        margin: 0;
+        min-height: 30px;
+        padding: 6px 10px;
         border: 1px solid #d5d5db;
-        border-radius: 12px;
+        border-radius: 10px;
         background: #ffffff;
         color: #666;
-        font-size: 14px;
+        font-size: 12px;
         font-weight: 600;
+        white-space: nowrap;
       }
 
       .reset:active {
@@ -239,6 +247,65 @@
           opacity: 1;
         }
       }
+
+      #resetConfirm {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        align-items: center;
+        justify-content: center;
+        z-index: 101;
+      }
+
+      #resetConfirm.show {
+        display: flex;
+      }
+
+      .confirm-card {
+        width: 84%;
+        max-width: 320px;
+        background: #fff;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      }
+
+      .confirm-title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #1f2937;
+      }
+
+      .confirm-body {
+        margin: 8px 0 14px;
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      .confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .confirm-btn {
+        min-height: 34px;
+        padding: 6px 12px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #4b5563;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .confirm-btn.danger {
+        background: #ef4444;
+        border-color: #ef4444;
+        color: #fff;
+      }
     </style>
   </head>
   <body>
@@ -253,32 +320,25 @@
       </div>
     </div>
 
-    <div class="container">
-      <h1>ラーメンの好み</h1>
-      <p class="sub">
-        登録された好みをもとに検索結果を表示します。<br />
-        設定なしでも保存、検索ができます。
-      </p>
-      <button id="resetBtn" class="reset" type="button">選択をリセットする</button>
-
-      <div class="row">
-        <div class="label">こってり</div>
-        <div class="segment" data-key="こってり">
-          <button type="button" data-value="love">大好き</button>
-          <button type="button" data-value="like">好き</button>
-          <button type="button" data-value="neutral">普通</button>
-          <button type="button" data-value="dislike">苦手</button>
+    <div id="resetConfirm" role="dialog" aria-modal="true" aria-labelledby="resetConfirmTitle">
+      <div class="confirm-card">
+        <p id="resetConfirmTitle" class="confirm-title">選択をリセットしますか？</p>
+        <p class="confirm-body">現在の画面上の選択がすべて解除されます。</p>
+        <div class="confirm-actions">
+          <button id="resetNoBtn" class="confirm-btn" type="button">いいえ</button>
+          <button id="resetYesBtn" class="confirm-btn danger" type="button">はい</button>
         </div>
       </div>
+    </div>
 
-      <div class="row">
-        <div class="label">あっさり</div>
-        <div class="segment" data-key="あっさり">
-          <button type="button" data-value="love">大好き</button>
-          <button type="button" data-value="like">好き</button>
-          <button type="button" data-value="neutral">普通</button>
-          <button type="button" data-value="dislike">苦手</button>
-        </div>
+    <div class="container">
+      <h1>ラーメンの好み</h1>
+      <div class="sub-row">
+        <p class="sub">
+          登録された好みをもとに検索結果を表示します。<br />
+          設定なしでも保存、検索ができます。
+        </p>
+        <button id="resetBtn" class="reset" type="button">選択リセット</button>
       </div>
 
       <div class="row">
@@ -388,22 +448,12 @@
     <script>
       let userId = null;
 
-      const STRONG_CATEGORIES = new Set(["あっさり", "こってり", "辛い"]);
-
-      const STRONG_SCORE_MAP = {
-        addict: 100,
-        love: 0.5,
-        like: 0.25,
+      const SCORE_MAP = {
+        addict: 1,
+        love: 0.15,
+        like: 0.075,
         neutral: 0,
-        dislike: -0.25,
-      };
-
-      const WEAK_SCORE_MAP = {
-        addict: 100,
-        love: 0.25,
-        like: 0.125,
-        neutral: 0,
-        dislike: -0.125,
+        dislike: -0.075,
       };
 
       async function main() {
@@ -458,10 +508,7 @@
       }
 
       function valueToWeight(category, value) {
-        const scoreMap = STRONG_CATEGORIES.has(category)
-          ? STRONG_SCORE_MAP
-          : WEAK_SCORE_MAP;
-        return scoreMap[value] ?? 0;
+        return SCORE_MAP[value] ?? 0;
       }
 
       function collectWeights() {
@@ -496,9 +543,13 @@
       }
 
       function weightToValue(category, weight) {
-        const scoreMap = STRONG_CATEGORIES.has(category)
-          ? { 100: "addict", 0.5: "love", 0.25: "like", 0: "neutral", "-0.25": "dislike" }
-          : { 100: "addict", 0.25: "love", 0.125: "like", 0: "neutral", "-0.125": "dislike" };
+        const scoreMap = {
+          1: "addict",
+          0.15: "love",
+          0.075: "like",
+          0: "neutral",
+          "-0.075": "dislike",
+        };
         return scoreMap[String(weight)];
       }
 
@@ -526,6 +577,14 @@
         document.querySelectorAll(".segment button.active").forEach((button) => {
           button.classList.remove("active");
         });
+      }
+
+      function openResetConfirm() {
+        document.getElementById("resetConfirm").classList.add("show");
+      }
+
+      function closeResetConfirm() {
+        document.getElementById("resetConfirm").classList.remove("show");
       }
 
       async function savePreferences() {
@@ -610,7 +669,17 @@
       document
         .getElementById("saveBtn")
         .addEventListener("click", savePreferences);
-      document.getElementById("resetBtn").addEventListener("click", resetSelections);
+      document.getElementById("resetBtn").addEventListener("click", openResetConfirm);
+      document.getElementById("resetNoBtn").addEventListener("click", closeResetConfirm);
+      document.getElementById("resetYesBtn").addEventListener("click", () => {
+        resetSelections();
+        closeResetConfirm();
+      });
+      document.getElementById("resetConfirm").addEventListener("click", (event) => {
+        if (event.target.id === "resetConfirm") {
+          closeResetConfirm();
+        }
+      });
 
       document.getElementById("closeBtn").addEventListener("click", () => {
         if (liff.isInClient()) {

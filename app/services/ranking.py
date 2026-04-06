@@ -10,15 +10,39 @@ def _review_penalty(count: int) -> float:
     return -0.5
 
 
-def _preference_score(item: dict, weights: dict[str, float]) -> float:
-    categories = item.get("categories") or []
-    return sum(weights.get(c, 0) for c in categories)
+def _preference_score(item: dict, weights: dict[str, float]) -> tuple[float, float]:
+    mentions = item.get("category_mentions")
+    if not isinstance(mentions, dict):
+        categories = item.get("categories") or []
+        base_score = sum(weights.get(c, 0) for c in categories)
+        addict_bonus = 1.0 if any((weights.get(c) or 0) >= 1.0 for c in categories) else 0.0
+        return base_score, addict_bonus
+
+    base_score = 0.0
+    has_addict_hit = False
+
+    for category, raw_count in mentions.items():
+        if not isinstance(category, str):
+            continue
+        if not isinstance(raw_count, int) or raw_count <= 0:
+            continue
+
+        weight = weights.get(category, 0.0) or 0.0
+        if weight >= 1.0:
+            has_addict_hit = True
+            continue
+
+        base_score += float(weight) * raw_count
+
+    addict_bonus = 1.0 if has_addict_hit else 0.0
+    return base_score, addict_bonus
 
 
 def _total_score(item: dict, weights: dict[str, float]) -> float:
     rating = item.get("rating") or 0
     rating_count = item.get("rating_count") or 0
-    return rating + _preference_score(item, weights) + _review_penalty(rating_count)
+    preference_score, addict_bonus = _preference_score(item, weights)
+    return rating + preference_score + addict_bonus + _review_penalty(rating_count)
 
 
 def sort_items(items: list[dict], weights: dict[str, float]) -> list[dict]:

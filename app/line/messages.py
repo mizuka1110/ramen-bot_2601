@@ -65,13 +65,13 @@ def _build_meta(vicinity: str, distance_m: int | None) -> str | None:
 
 
 def _weight_status(value: float) -> tuple[str, str]:
-    if value >= 100:
+    if value >= 1:
         return ("中毒", "#7C3AED")
-    if value >= 0.5:
+    if value >= 0.15:
         return ("めちゃ好き", "#DC2626")
-    if value >= 0.25:
+    if value >= 0.075:
         return ("好き", "#EA580C")
-    if value <= -0.25:
+    if value <= -0.075:
         return ("苦手", "#2563EB")
     return ("未登録", "#6B7280")
 
