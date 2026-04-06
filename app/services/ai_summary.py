@@ -55,7 +55,7 @@ async def extract_ramen_categories(
 
     prompt = (
         "次のラーメン店の説明文・口コミから、該当するカテゴリのみを選んでください。\n"
-        "候補: あっさり, こってり, 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系\n"
+        "候補: 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系\n"
         "出力は候補の中から該当するものだけを、カンマ区切りで1行で返してください。\n"
         "該当なしなら空文字で返してください。\n\n"
         f"{source_text}"
@@ -71,8 +71,6 @@ async def extract_ramen_categories(
         return []
 
     allowed_categories = {
-        "あっさり",
-        "こってり",
         "魚介",
         "煮干し",
         "鶏白湯",
@@ -96,3 +94,81 @@ async def extract_ramen_categories(
         if c.strip()
     ]
     return [c for c in categories if c in allowed_categories]
+
+
+async def extract_ramen_category_mentions(
+    editorial_summary: str | None,
+    reviews: list[ReviewItem],
+) -> dict[str, int]:
+    sources: list[tuple[str, str]] = []
+
+    if editorial_summary and editorial_summary.strip():
+        sources.append(("editorial", editorial_summary.strip()))
+
+    for idx, review in enumerate(reviews[:5], start=1):
+        text = (review.get("text") or "").strip()
+        if text:
+            sources.append((f"review{idx}", text))
+
+    if not sources:
+        return {}
+
+    prompt_lines = [
+        "次の各ソースについて、ラーメンカテゴリを判定してください。",
+        "候補: 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系",
+        "出力形式は必ず各行を次の形で返すこと:",
+        "source_id|カテゴリ1,カテゴリ2",
+        "該当カテゴリが無い場合は source_id| だけ返すこと。",
+        "",
+    ]
+    prompt_lines.extend(f"{source_id}: {text}" for source_id, text in sources)
+    prompt = "\n".join(prompt_lines)
+
+    resp = await client.responses.create(
+        model="gpt-4o-mini",
+        input=prompt,
+    )
+
+    output = (resp.output_text or "").strip()
+    if not output:
+        return {}
+
+    allowed_categories = {
+        "魚介",
+        "煮干し",
+        "鶏白湯",
+        "豚骨",
+        "醤油",
+        "味噌",
+        "塩",
+        "辛い",
+        "家系",
+        "二郎系",
+    }
+    aliases = {
+        "しょうゆ": "醤油",
+        "しお": "塩",
+    }
+    valid_source_ids = {source_id for source_id, _ in sources}
+
+    mentions: dict[str, int] = {}
+    for line in output.splitlines():
+        raw = line.strip()
+        if not raw or "|" not in raw:
+            continue
+        source_id, categories_text = raw.split("|", 1)
+        source_id = source_id.strip()
+        if source_id not in valid_source_ids:
+            continue
+
+        categories = {
+            aliases.get(c.strip(), c.strip())
+            for c in categories_text.split(",")
+            if c.strip()
+        }
+
+        for category in categories:
+            if category in allowed_categories:
+                mentions[category] = mentions.get(category, 0) + 1
+
+    return mentions

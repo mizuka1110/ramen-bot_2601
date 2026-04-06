@@ -1,8 +1,6 @@
 from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 
 PREFERENCE_CATEGORIES = {
-    "あっさり": "あっさり",
-    "こってり": "こってり",
     "魚介": "魚介系",
     "煮干し": "煮干し",
     "鶏白湯": "鶏白湯",
@@ -16,10 +14,10 @@ PREFERENCE_CATEGORIES = {
 }
 
 PREFERENCE_VALUE_MAP = {
-    "like": 0.25,
-    "love": 0.5,
-    "addict": 100.0,
-    "dislike": -0.25,
+    "like": 0.075,
+    "love": 0.15,
+    "addict": 1.0,
+    "dislike": -0.075,
 }
 
 PREFERENCE_LABEL_MAP = {
