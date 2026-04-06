@@ -98,6 +98,8 @@
       const envHint = document.getElementById("envHint");
 
       const now = new Date();
+      const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+      let holidayMap = {};
 
       function buildOptions(select, from, to, suffix = "", pad = false, step = 1) {
         for (let i = from; i <= to; i += step) {
@@ -111,6 +113,29 @@
 
       function daysInMonth(y, m) {
         return new Date(Number(y), Number(m), 0).getDate();
+      }
+
+      function formatDateKey(y, m, d) {
+        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      }
+
+      function dayLabel(y, m, d) {
+        const date = new Date(Number(y), Number(m) - 1, Number(d));
+        const weekday = weekdays[date.getDay()];
+        const key = formatDateKey(y, m, d);
+        const holidayName = holidayMap[key];
+        const holidaySuffix = holidayName ? "・祝" : "";
+        return `${d}日(${weekday}${holidaySuffix})`;
+      }
+
+      async function loadHolidayMap() {
+        try {
+          const response = await fetch("https://holidays-jp.github.io/api/v1/date.json");
+          if (!response.ok) return;
+          holidayMap = (await response.json()) || {};
+        } catch (_error) {
+          holidayMap = {};
+        }
       }
 
       buildOptions(year, now.getFullYear(), now.getFullYear() + 1, "年");
@@ -127,16 +152,22 @@
         const maxDays = daysInMonth(year.value, month.value);
         const prev = day.value || String(now.getDate()).padStart(2, "0");
         day.innerHTML = "";
-        buildOptions(day, 1, maxDays, "日", true);
+        for (let i = 1; i <= maxDays; i += 1) {
+          const option = document.createElement("option");
+          option.value = String(i).padStart(2, "0");
+          option.textContent = dayLabel(year.value, month.value, i);
+          day.appendChild(option);
+        }
         day.value = Number(prev) <= maxDays ? prev : String(maxDays).padStart(2, "0");
       }
 
       year.addEventListener("change", syncDays);
       month.addEventListener("change", syncDays);
-      syncDays();
 
       const liffId =
         new URLSearchParams(window.location.search).get("liffId") || "2009360861-udWtvLeU";
+
+      loadHolidayMap().finally(syncDays);
 
       liff
         .init({ liffId })
@@ -173,7 +204,7 @@
           });
         })
         .catch((err) => {
-          alert("LIFFの初期化に失敗しました: " + err);
+          alert("LIFFの初期に失敗しました: " + err);
         });
     </script>
   </body>

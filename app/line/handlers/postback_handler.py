@@ -5,7 +5,7 @@ from app.line.messages import (
     build_preference_menu_flex,
 )
 from app.line.state import clear_search_session, get_search_session, set_search_session
-from app.services.line_client import line_reply
+from app.services.line_client import line_loading, line_reply
 from app.services.preference_service import (
     PREFERENCE_CATEGORIES,
     get_preference_choice_label,
@@ -53,6 +53,8 @@ async def handle_postback(
                 [{"type": "text", "text": "検索状態が切れたので、もう一度現在地を送ってね🙏"}],
             )
             return
+        
+        await line_loading(user_id)
 
         items, had_error, has_more, _used_radius = await search_ramen_items(
             lat=lat,
@@ -79,7 +81,7 @@ async def handle_postback(
         messages: list[dict] = [
             build_flex_carousel(
                 items,
-                show_business_hours=isinstance(search_datetime, str) and bool(search_datetime),
+                show_business_hours=False,
             )
         ]
         next_offset = offset + 10
