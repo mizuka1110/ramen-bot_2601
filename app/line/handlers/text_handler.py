@@ -213,7 +213,7 @@ async def handle_text_message(
             [
                 {
                     "type": "text",
-                    "text": "これからすぐ行けるラーメン屋さんを検索します。\n\n下のボタンから検索地点を送ってね",
+                    "text": "これからすぐ行けるラーメン屋さんを検索します。\n\n下のボタンから検索地点を送ってください🍜",
                     "quickReply": {
                         "items": [
                             {
