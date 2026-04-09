@@ -45,11 +45,18 @@ def _total_score(item: dict, weights: dict[str, float]) -> float:
     return rating + preference_score + addict_bonus + _review_penalty(rating_count)
 
 
+def _is_effectively_open(item: dict) -> bool:
+    open_at_search_time = item.get("open_at_search_time")
+    if isinstance(open_at_search_time, bool):
+        return open_at_search_time
+    return item.get("open_now") is True
+
+
 def sort_items(items: list[dict], weights: dict[str, float]) -> list[dict]:
     return sorted(
         items,
         key=lambda x: (
-            not (x.get("open_now") is True),
+            not _is_effectively_open(x),
             -_total_score(x, weights),
         )
     )

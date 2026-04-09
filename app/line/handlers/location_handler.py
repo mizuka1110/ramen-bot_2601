@@ -53,7 +53,7 @@ async def handle_location_message(
         lng=lng,
         line_user_id=user_id,
         offset=0,
-        page_size=10,
+        page_size=20,
         search_datetime=search_datetime,
     )
 
@@ -94,8 +94,11 @@ async def handle_location_message(
             "text": f"※{timestamp_label}時点の営業情報です。実際の状況と異なる場合があります。",
         }
 
+    first_page_items = items[:10]
+    prefetched_items = items[10:20]
+
     flex = build_flex_carousel(
-        items,
+        first_page_items,
         show_business_hours=selected_datetime is not None,
     )
     messages: list[dict] = []
@@ -124,13 +127,15 @@ async def handle_location_message(
             }
         )
         clear_search_session(user_id)
-    elif has_more:
+    elif prefetched_items or has_more:
         set_search_session(
             user_id,
             lat=lat,
             lng=lng,
             next_offset=10,
             search_datetime=search_datetime,
+            prefetched_items=prefetched_items,
+            has_more_after_prefetch=has_more,
         )
         messages.append(build_okawari_message(next_offset=10))
     else:
