@@ -4,7 +4,15 @@ import re
 from app.services.preference_service import PREFERENCE_CATEGORIES
 
 
-def _open_label(open_now: bool | None) -> tuple[str, str]:
+def _open_label(
+    open_now: bool | None,
+    open_at_search_time: bool | None = None,
+    show_business_hours: bool = False,
+) -> tuple[str, str]:
+    if show_business_hours and open_at_search_time is True:
+        return ("指定時刻に営業中", "#16A34A")
+    if show_business_hours and open_at_search_time is False:
+        return ("時間外", "#6B7280")
     if open_now is True:
         return ("営業中", "#16A34A")
     if open_now is False:
@@ -328,7 +336,12 @@ def shop_to_bubble(
     show_business_hours: bool = False,
 ) -> dict:
     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
-    label_text, label_bg = _open_label(item.get("open_now"))
+    is_open_at_search_time = show_business_hours and item.get("open_at_search_time") is True
+    label_text, label_bg = _open_label(
+        item.get("open_now"),
+        item.get("open_at_search_time"),
+        show_business_hours=show_business_hours,
+    )
 
     vicinity = _short_vicinity(item.get("vicinity"))
     distance_m = item.get("distance_m")
@@ -345,33 +358,34 @@ def shop_to_bubble(
     map_url = place_url
 
     business_hours_text = item.get("business_hours_text")
-    status_contents: list[dict] = [
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": label_text,
-                    "size": "xs",
-                    "weight": "bold",
-                    "color": "#FFFFFF",
-                    "align": "center",
-                    "gravity": "center",
-                    "flex": 0,
-                }
-            ],
-            "justifyContent": "center",
-            "alignItems": "center",
-            "backgroundColor": label_bg,
-            "cornerRadius": "8px",
-            "paddingAll": "4px",
-            "paddingStart": "10px",
-            "paddingEnd": "10px",
-            "flex": 0,
-            "maxWidth": "58px",
-        },
-    ]
+    label_box = {
+        "type": "box",
+        "layout": "horizontal",
+        "contents": [
+            {
+                "type": "text",
+                "text": label_text,
+                "size": "xs",
+                "weight": "bold",
+                "color": "#FFFFFF",
+                "align": "center",
+                "gravity": "center",
+                "flex": 0,
+            }
+        ],
+        "justifyContent": "center",
+        "alignItems": "center",
+        "backgroundColor": label_bg,
+        "cornerRadius": "8px",
+        "paddingAll": "4px",
+        "paddingStart": "10px",
+        "paddingEnd": "10px",
+        "flex": 0,
+    }
+    if not is_open_at_search_time:
+        label_box["maxWidth"] = "58px"
+
+    status_contents: list[dict] = [label_box]
     if show_business_hours and isinstance(business_hours_text, str) and business_hours_text.strip():
         status_contents.append(
             {

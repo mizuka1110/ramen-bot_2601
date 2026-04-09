@@ -46,6 +46,8 @@ async def handle_postback(
         lng = session.get("lng")
         offset = session.get("next_offset")
         search_datetime = session.get("search_datetime")
+        prefetched_items = session.get("prefetched_items")
+        has_more_after_prefetch = session.get("has_more_after_prefetch")
         if not isinstance(lat, float) or not isinstance(lng, float) or not isinstance(offset, int):
             clear_search_session(user_id)
             await line_reply(
@@ -56,14 +58,24 @@ async def handle_postback(
         
         await line_loading(user_id)
 
-        items, had_error, has_more, _used_radius = await search_ramen_items(
-            lat=lat,
-            lng=lng,
-            line_user_id=user_id,
-            offset=offset,
-            page_size=10,
-            search_datetime=search_datetime if isinstance(search_datetime, str) else None,
+        use_prefetched = (
+            offset == 10
+            and isinstance(prefetched_items, list)
+            and len(prefetched_items) > 0
         )
+        if use_prefetched:
+            items = prefetched_items
+            had_error = False
+            has_more = bool(has_more_after_prefetch)
+        else:
+            items, had_error, has_more, _used_radius = await search_ramen_items(
+                lat=lat,
+                lng=lng,
+                line_user_id=user_id,
+                offset=offset,
+                page_size=10,
+                search_datetime=search_datetime if isinstance(search_datetime, str) else None,
+            )
         if not items:
             if had_error:
                 await line_reply(

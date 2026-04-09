@@ -55,7 +55,7 @@ async def search_ramen_items(
             result,
             user_lat=lat,
             user_lng=lng,
-            limit=20,
+            limit=30,
         )
 
         for item in radius_items:
@@ -145,6 +145,10 @@ async def _enrich_item(
     if hours_text:
         item["business_hours_text"] = hours_text
 
+    open_at_target = _is_open_at_datetime(opening_hours, search_datetime)
+    if open_at_target is not None:
+        item["open_at_search_time"] = open_at_target
+
 
 def _hours_for_date(opening_hours: dict[str, object], search_datetime: str | None) -> str | None:
     if not search_datetime:
@@ -168,6 +172,78 @@ def _hours_for_date(opening_hours: dict[str, object], search_datetime: str | Non
     if ":" in entry:
         return entry.split(":", 1)[1].strip()
     return entry.strip() or None
+
+
+def _is_open_at_datetime(opening_hours: dict[str, object], search_datetime: str | None) -> bool | None:
+    if not search_datetime:
+        return None
+
+    periods = opening_hours.get("periods")
+    if not isinstance(periods, list) or not periods:
+        return None
+
+    try:
+        target_dt = datetime.fromisoformat(search_datetime)
+    except ValueError:
+        return None
+
+    # Python weekday: Mon=0..Sun=6
+    # Google opening_hours.periods day: Sun=0..Sat=6
+    target_day = (target_dt.weekday() + 1) % 7
+    target_minutes = target_dt.hour * 60 + target_dt.minute
+
+    for period in periods:
+        if not isinstance(period, dict):
+            continue
+
+        open_info = period.get("open")
+        if not isinstance(open_info, dict):
+            continue
+
+        open_day = open_info.get("day")
+        open_time = open_info.get("time")
+        if not isinstance(open_day, int) or not isinstance(open_time, str) or len(open_time) != 4:
+            continue
+
+        try:
+            open_minutes = int(open_time[:2]) * 60 + int(open_time[2:])
+        except ValueError:
+            continue
+
+        close_info = period.get("close")
+        if isinstance(close_info, dict):
+            close_day = close_info.get("day")
+            close_time = close_info.get("time")
+            if not isinstance(close_day, int) or not isinstance(close_time, str) or len(close_time) != 4:
+                continue
+            try:
+                close_minutes = int(close_time[:2]) * 60 + int(close_time[2:])
+            except ValueError:
+                continue
+        else:
+            # closeが無い場合は24時間営業扱い
+            close_day = (open_day + 1) % 7
+            close_minutes = open_minutes
+
+        # 同日内の営業
+        if open_day == close_day and open_minutes < close_minutes:
+            if target_day == open_day and open_minutes <= target_minutes < close_minutes:
+                return True
+            continue
+
+        # 日跨ぎ営業（または24時間営業）
+        if target_day == open_day and target_minutes >= open_minutes:
+            return True
+        if target_day == close_day and target_minutes < close_minutes:
+            return True
+
+        span_day = (open_day + 1) % 7
+        while span_day != close_day:
+            if target_day == span_day:
+                return True
+            span_day = (span_day + 1) % 7
+
+    return False
 
 
 async def enrich_items(items: list[dict[str, object]], search_datetime: str | None = None) -> None:
