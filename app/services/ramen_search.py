@@ -28,6 +28,7 @@ async def search_ramen_items(
     offset: int = 0,
     page_size: int = 10,
     search_datetime: str | None = None,
+    prioritize_open_now_status: bool = False,
 ) -> tuple[list[dict[str, object]], bool, bool, int | None]:
     q = "ラーメン"
     had_error = False
@@ -80,7 +81,11 @@ async def search_ramen_items(
     await enrich_items(items, search_datetime=search_datetime)
 
     weights = get_user_weights(line_user_id) if line_user_id else {}
-    ranked_items = sort_items(items, weights=weights)
+    ranked_items = sort_items(
+        items,
+        weights=weights,
+        prioritize_open_now_status=prioritize_open_now_status,
+    )
     page_items = ranked_items[offset:offset + page_size]
     has_more = offset + page_size < len(ranked_items)
 
