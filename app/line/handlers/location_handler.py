@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.line.messages import (
     build_flex_carousel,
@@ -44,7 +44,7 @@ async def handle_location_message(
     lat = float(lat_value)
     lng = float(lng_value)
     selected_datetime = get_user_datetime(user_id)
-    search_datetime = selected_datetime or datetime.now(timezone.utc).isoformat(timespec="minutes")
+    search_datetime = selected_datetime
 
     await line_loading(user_id)
 
@@ -55,6 +55,7 @@ async def handle_location_message(
         offset=0,
         page_size=20,
         search_datetime=search_datetime,
+        prioritize_open_now_status=selected_datetime is None,
     )
 
     if not items:

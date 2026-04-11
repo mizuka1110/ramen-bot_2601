@@ -75,6 +75,7 @@ async def handle_postback(
                 offset=offset,
                 page_size=10,
                 search_datetime=search_datetime if isinstance(search_datetime, str) else None,
+                prioritize_open_now_status=not isinstance(search_datetime, str),
             )
         if not items:
             if had_error:

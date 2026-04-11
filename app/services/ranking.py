@@ -52,7 +52,29 @@ def _is_effectively_open(item: dict) -> bool:
     return item.get("open_now") is True
 
 
-def sort_items(items: list[dict], weights: dict[str, float]) -> list[dict]:
+def _open_now_priority(item: dict) -> int:
+    open_now = item.get("open_now")
+    if open_now is True:
+        return 0
+    if open_now is None:
+        return 1
+    return 2
+
+
+def sort_items(
+    items: list[dict],
+    weights: dict[str, float],
+    prioritize_open_now_status: bool = False,
+) -> list[dict]:
+    if prioritize_open_now_status:
+        return sorted(
+            items,
+            key=lambda x: (
+                _open_now_priority(x),
+                -_total_score(x, weights),
+            ),
+        )
+
     return sorted(
         items,
         key=lambda x: (
