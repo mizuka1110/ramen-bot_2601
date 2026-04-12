@@ -10,16 +10,26 @@ def _review_penalty(count: int) -> float:
     return -0.5
 
 
+def _addict_multiplier(raw_count: int) -> float:
+    if raw_count <= 1:
+        return 1.05
+    if raw_count <= 3:
+        return 1.15
+    return 1.3
+
+
 def _preference_score(item: dict, weights: dict[str, float]) -> tuple[float, float]:
     mentions = item.get("category_mentions")
     if not isinstance(mentions, dict):
         categories = item.get("categories") or []
         base_score = sum(weights.get(c, 0) for c in categories)
-        addict_bonus = 1.0 if any((weights.get(c) or 0) >= 1.0 for c in categories) else 0.0
+        addict_bonus = (
+            1.05 if any((weights.get(c) or 0) >= 1.0 for c in categories) else 0.0
+        )
         return base_score, addict_bonus
 
     base_score = 0.0
-    has_addict_hit = False
+    addict_bonus = 0.0
 
     for category, raw_count in mentions.items():
         if not isinstance(category, str):
@@ -29,12 +39,11 @@ def _preference_score(item: dict, weights: dict[str, float]) -> tuple[float, flo
 
         weight = weights.get(category, 0.0) or 0.0
         if weight >= 1.0:
-            has_addict_hit = True
+            addict_bonus += _addict_multiplier(raw_count)
             continue
 
         base_score += float(weight) * raw_count
 
-    addict_bonus = 1.0 if has_addict_hit else 0.0
     return base_score, addict_bonus
 
 
