@@ -479,8 +479,8 @@ def shop_to_bubble(
             {
                 "type": "text",
                 "text": business_hours_text,
-                "size": "xxs",
-                "color": "#9CA3AF",
+                "size": "11px",
+                "color": "#6B7280",
                 "wrap": True,
             }
         )
