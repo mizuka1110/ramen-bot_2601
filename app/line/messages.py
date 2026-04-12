@@ -454,7 +454,8 @@ def shop_to_bubble(
             "type": "text",
             "text": item.get("name") or "-",
             "weight": "bold",
-            "size": "lg",
+            "size": "xl",
+            "color": "#111827",
             "wrap": True,
             "flex": 1,
         }
@@ -478,8 +479,8 @@ def shop_to_bubble(
             {
                 "type": "text",
                 "text": business_hours_text,
-                "size": "xs",
-                "color": "#6B7280",
+                "size": "xxs",
+                "color": "#9CA3AF",
                 "wrap": True,
             }
         )
