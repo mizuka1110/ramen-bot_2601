@@ -72,6 +72,56 @@ def _build_meta(vicinity: str, distance_m: int | None) -> str | None:
     return "｜".join(parts) if parts else None
 
 
+def _build_rank_badge(rank: int | None) -> dict | None:
+    if rank not in (1, 2, 3):
+        return None
+
+    base = (os.getenv("PUBLIC_BASE_URL") or "").rstrip("/")
+    medal_candidates = {
+        1: "gold.png",
+        2: "silver.png",
+        3: "bronze.png",
+    }
+
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+    static_dir = os.path.abspath(static_dir)
+    selected_file = medal_candidates[rank]
+    if base and os.path.exists(os.path.join(static_dir, selected_file)):
+        return {
+            "type": "image",
+            "url": f"{base}/static/{selected_file}",
+            "size": "30px",
+            "aspectRatio": "35:42",
+            "aspectMode": "fit",
+            "flex": 0,
+        }
+
+    # 画像が無い場合は絵文字バッジにフォールバック
+    emoji_map = {1: "🥇", 2: "🥈", 3: "🥉"}
+    return {
+        "type": "box",
+        "layout": "horizontal",
+        "width": "30px",
+        "height": "30px",
+        "contents": [
+            {
+                "type": "text",
+                "text": emoji_map[rank],
+                "size": "lg",
+                "align": "center",
+                "gravity": "center",
+                "flex": 0,
+            }
+        ],
+        "justifyContent": "center",
+        "alignItems": "center",
+        "backgroundColor": "#FFFFFFCC",
+        "cornerRadius": "15px",
+        "paddingAll": "0px",
+        "flex": 0,
+    }
+
+
 def _weight_status(value: float) -> tuple[str, str]:
     if value >= 1:
         return ("中毒", "#7C3AED")
@@ -334,6 +384,7 @@ def build_search_radius_message(radius_m: int) -> dict:
 def shop_to_bubble(
     item: dict,
     show_business_hours: bool = False,
+    rank: int | None = None,
 ) -> dict:
     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
     is_open_at_search_time = show_business_hours and item.get("open_at_search_time") is True
@@ -342,6 +393,8 @@ def shop_to_bubble(
         item.get("open_at_search_time"),
         show_business_hours=show_business_hours,
     )
+    if isinstance(label_bg, str) and label_bg.startswith("#") and len(label_bg) == 7:
+        label_bg = f"{label_bg}CC"
 
     vicinity = _short_vicinity(item.get("vicinity"))
     distance_m = item.get("distance_m")
@@ -356,63 +409,80 @@ def shop_to_bubble(
             rating_text += f"（{rating_count}）"
 
     map_url = place_url
-
     business_hours_text = item.get("business_hours_text")
-    label_box = {
+
+    hero_status_box = {
         "type": "box",
         "layout": "horizontal",
+        "position": "absolute",
+        "offsetStart": "10px",
+        "offsetBottom": "10px",
         "contents": [
             {
                 "type": "text",
                 "text": label_text,
-                "size": "xs",
+                "size": "xxs",
                 "weight": "bold",
                 "color": "#FFFFFF",
                 "align": "center",
                 "gravity": "center",
-                "flex": 0,
+                "wrap": False,
+                "maxLines": 1,
+                "adjustMode": "shrink-to-fit",
+                "flex": 1,
             }
         ],
         "justifyContent": "center",
         "alignItems": "center",
         "backgroundColor": label_bg,
         "cornerRadius": "8px",
-        "paddingAll": "4px",
-        "paddingStart": "10px",
-        "paddingEnd": "10px",
+        "paddingAll": "3px",
+        "paddingStart": "6px",
+        "paddingEnd": "6px",
+        "maxWidth": "112px",
         "flex": 0,
     }
-    if not is_open_at_search_time:
-        label_box["maxWidth"] = "58px"
+    rank_badge = _build_rank_badge(rank)
+    if rank_badge:
+        rank_badge["position"] = "absolute"
+        rank_badge["offsetStart"] = "10px"
+        rank_badge["offsetTop"] = "10px"
 
-    status_contents: list[dict] = [label_box]
-    if show_business_hours and isinstance(business_hours_text, str) and business_hours_text.strip():
-        status_contents.append(
-            {
-                "type": "text",
-                "text": business_hours_text,
-                "size": "xs",
-                "color": "#6B7280",
-                "flex": 0,
-                "margin": "sm",
-            }
-        )
-
-    body_contents = [
-        {
-            "type": "box",
-            "layout": "vertical",
-            "alignItems": "flex-start",
-            "contents": status_contents,
-        },
+    name_contents: list[dict] = []
+    name_contents.append(
         {
             "type": "text",
             "text": item.get("name") or "-",
             "weight": "bold",
             "size": "lg",
             "wrap": True,
-        },
-    ]
+            "flex": 1,
+        }
+    )
+
+    body_contents = []
+    body_contents.extend(
+        [
+            {
+                "type": "box",
+                "layout": "horizontal",
+                "alignItems": "center",
+                "spacing": "sm",
+                "contents": name_contents,
+            },
+        ]
+    )
+
+    if show_business_hours and isinstance(business_hours_text, str) and business_hours_text.strip():
+        body_contents.append(
+            {
+                "type": "text",
+                "text": business_hours_text,
+                "size": "xs",
+                "color": "#6B7280",
+                "wrap": True,
+            }
+        )
 
     # 住所・距離は存在する場合のみ追加
     if meta:
@@ -450,18 +520,31 @@ def shop_to_bubble(
             }
         )
 
-    return {
-        "type": "bubble",
-        "hero": {
+    hero_contents: list[dict] = [
+        {
             "type": "image",
             "url": _photo_url(item.get("photo_reference")),
             "size": "full",
-            "aspectRatio": "16:9",
+            "aspectRatio": "4:3",
             "aspectMode": "cover",
             "action": {
                 "type": "uri",
                 "uri": place_url,
             },
+        },
+        hero_status_box,
+    ]
+    if rank_badge:
+        hero_contents.append(rank_badge)
+
+    return {
+        "type": "bubble",
+        "hero": {
+            "type": "box",
+            "layout": "vertical",
+            "alignItems": "flex-start",
+            "paddingAll": "0px",
+            "contents": hero_contents,
         },
         "body": {
             "type": "box",
@@ -519,8 +602,9 @@ def build_flex_carousel(
             shop_to_bubble(
                 x,
                 show_business_hours=show_business_hours,
+                rank=i + 1,
             )
-            for x in (items or [])[:10]
+            for i, x in enumerate((items or [])[:10])
         )
         if b
     ]
