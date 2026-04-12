@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from datetime import datetime
 
 from app.db.user_pref_repo import get_user_weights
@@ -173,10 +174,19 @@ def _hours_for_date(opening_hours: dict[str, object], search_datetime: str | Non
         return None
 
     if "：" in entry:
-        return entry.split("：", 1)[1].strip()
-    if ":" in entry:
-        return entry.split(":", 1)[1].strip()
-    return entry.strip() or None
+        hours = entry.split("：", 1)[1].strip()
+    elif ":" in entry:
+        hours = entry.split(":", 1)[1].strip()
+    else:
+        hours = entry.strip()
+
+    if not hours:
+        return None
+
+    normalized = hours.replace("～", "〜").replace("~", "〜")
+    normalized = re.sub(r"\s*[、,，]\s*", " / ", normalized)
+    normalized = re.sub(r"\s*/\s*", " / ", normalized)
+    return normalized.strip()
 
 
 def _is_open_at_datetime(opening_hours: dict[str, object], search_datetime: str | None) -> bool | None:
