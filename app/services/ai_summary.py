@@ -22,7 +22,7 @@ async def summarize_reviews_30(reviews: list[ReviewItem]) -> str | None:
 
     prompt = (
         "次の口コミを日本語で1文のみ、25字で要約して。"
-        "主に味に関するポジティブな内容を使って"
+        "主にラーメンの味に関するポジティブな内容を使って"
         "客観的な文体にし、ですますは使わない\n\n"
         + "\n".join(f"- {t}" for t in texts)
     )
