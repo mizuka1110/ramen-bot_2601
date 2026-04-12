@@ -1,6 +1,8 @@
 from app.db.user_pref_repo import get_user_weights, upsert_user_weights
 
 PREFERENCE_CATEGORIES = {
+    "つけ麺": "つけ麺",
+    "まぜそば": "まぜそば",
     "魚介": "魚介系",
     "煮干し": "煮干し",
     "鶏白湯": "鶏白湯",
