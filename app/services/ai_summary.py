@@ -55,7 +55,7 @@ async def extract_ramen_categories(
 
     prompt = (
         "次のラーメン店の説明文・口コミから、該当するカテゴリのみを選んでください。\n"
-        "候補: 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系\n"
+        "候補: つけ麺, まぜそば, 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系\n"
         "出力は候補の中から該当するものだけを、カンマ区切りで1行で返してください。\n"
         "該当なしなら空文字で返してください。\n\n"
         f"{source_text}"
@@ -71,6 +71,8 @@ async def extract_ramen_categories(
         return []
 
     allowed_categories = {
+        "つけ麺",
+        "まぜそば",
         "魚介",
         "煮干し",
         "鶏白湯",
@@ -115,7 +117,7 @@ async def extract_ramen_category_mentions(
 
     prompt_lines = [
         "次の各ソースについて、ラーメンカテゴリを判定してください。",
-        "候補: 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系",
+        "候補: つけ麺, まぜそば, 魚介, 煮干し, 鶏白湯, 豚骨, 醤油, 味噌, 塩, 辛い, 家系, 二郎系",
         "出力形式は必ず各行を次の形で返すこと:",
         "source_id|カテゴリ1,カテゴリ2",
         "該当カテゴリが無い場合は source_id| だけ返すこと。",
@@ -134,6 +136,8 @@ async def extract_ramen_category_mentions(
         return {}
 
     allowed_categories = {
+        "つけ麺",
+        "まぜそば",
         "魚介",
         "煮干し",
         "鶏白湯",
