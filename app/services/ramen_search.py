@@ -183,10 +183,38 @@ def _hours_for_date(opening_hours: dict[str, object], search_datetime: str | Non
     if not hours:
         return None
 
-    normalized = hours.replace("～", "〜").replace("~", "〜")
+    normalized = _normalize_business_hours_text(hours)
     normalized = re.sub(r"\s*[、,，]\s*", " / ", normalized)
     normalized = re.sub(r"\s*/\s*", " / ", normalized)
     return normalized.strip()
+
+
+def _normalize_business_hours_text(hours: str) -> str:
+    normalized = hours.replace("～", "〜").replace("~", "〜")
+    normalized = normalized.translate(str.maketrans("０１２３４５６７８９：", "0123456789:"))
+
+    def replace_japanese_time(match: re.Match[str]) -> str:
+        am_pm = match.group(1)
+        hour = int(match.group(2))
+        minute = int(match.group(3) or "0")
+
+        if am_pm == "午前":
+            hour = 0 if hour == 12 else hour
+        elif am_pm == "午後":
+            hour = 12 if hour == 12 else hour + 12
+
+        if hour >= 24 or minute >= 60:
+            return match.group(0)
+
+        return f"{hour:02d}:{minute:02d}"
+
+    normalized = re.sub(
+        r"(午前|午後)?\s*(\d{1,2})\s*(?:[:時]\s*(\d{1,2}))?\s*分?",
+        replace_japanese_time,
+        normalized,
+    )
+    normalized = re.sub(r"\b([01]\d|2[0-3])([0-5]\d)\b", r"\1:\2", normalized)
+    return normalized
 
 
 def _is_open_at_datetime(opening_hours: dict[str, object], search_datetime: str | None) -> bool | None:
