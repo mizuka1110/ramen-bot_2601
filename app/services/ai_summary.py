@@ -5,9 +5,38 @@ from openai import AsyncOpenAI
 client = AsyncOpenAI()
 
 
+ALLOWED_CATEGORIES = {
+    "つけ麺",
+    "まぜそば",
+    "魚介",
+    "煮干し",
+    "鶏白湯",
+    "豚骨",
+    "醤油",
+    "味噌",
+    "塩",
+    "辛い",
+    "家系",
+    "二郎系",
+}
+
+CATEGORY_ALIASES = {
+    "しょうゆ": "醤油",
+    "しお": "塩",
+    "つけめん": "つけ麺",
+    "つけ麺系": "つけ麺",
+    "まぜ麺": "まぜそば",
+    "油そば": "まぜそば",
+}
+
+
 class ReviewItem(TypedDict, total=False):
     text: str
     rating: int | float
+
+
+def _canonicalize_category(raw: str) -> str:
+    return CATEGORY_ALIASES.get(raw.strip(), raw.strip())
 
 
 async def summarize_reviews_30(reviews: list[ReviewItem]) -> str | None:
@@ -70,32 +99,12 @@ async def extract_ramen_categories(
     if not result:
         return []
 
-    allowed_categories = {
-        "つけ麺",
-        "まぜそば",
-        "魚介",
-        "煮干し",
-        "鶏白湯",
-        "豚骨",
-        "醤油",
-        "味噌",
-        "塩",
-        "辛い",
-        "家系",
-        "二郎系",
-    }
-
-    aliases = {
-        "しょうゆ": "醤油",
-        "しお": "塩",
-    }
-
     categories = [
-        aliases.get(c.strip(), c.strip())
+        _canonicalize_category(c)
         for c in result.split(",")
         if c.strip()
     ]
-    return [c for c in categories if c in allowed_categories]
+    return [c for c in categories if c in ALLOWED_CATEGORIES]
 
 
 async def extract_ramen_category_mentions(
@@ -135,24 +144,6 @@ async def extract_ramen_category_mentions(
     if not output:
         return {}
 
-    allowed_categories = {
-        "つけ麺",
-        "まぜそば",
-        "魚介",
-        "煮干し",
-        "鶏白湯",
-        "豚骨",
-        "醤油",
-        "味噌",
-        "塩",
-        "辛い",
-        "家系",
-        "二郎系",
-    }
-    aliases = {
-        "しょうゆ": "醤油",
-        "しお": "塩",
-    }
     valid_source_ids = {source_id for source_id, _ in sources}
 
     mentions: dict[str, int] = {}
@@ -166,13 +157,13 @@ async def extract_ramen_category_mentions(
             continue
 
         categories = {
-            aliases.get(c.strip(), c.strip())
+            _canonicalize_category(c)
             for c in categories_text.split(",")
             if c.strip()
         }
 
         for category in categories:
-            if category in allowed_categories:
+            if category in ALLOWED_CATEGORIES:
                 mentions[category] = mentions.get(category, 0) + 1
 
     return mentions
