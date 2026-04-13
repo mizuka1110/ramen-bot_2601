@@ -81,6 +81,20 @@ async def search_ramen_items(
     # Enrich all candidates before sorting so preference weights are reflected.
     await enrich_items(items, search_datetime=search_datetime)
 
+    items = [
+        item
+        for item in items
+        if not item.get("_needs_ramen_review_revival")
+        or bool(item.get("_revived_by_ramen_review"))
+    ]
+
+    for item in items:
+        item.pop("_needs_ramen_review_revival", None)
+        item.pop("_revived_by_ramen_review", None)
+
+    if not items:
+        return [], had_error, False, used_radius
+
     weights = get_user_weights(line_user_id) if line_user_id else {}
     ranked_items = sort_items(
         items,
@@ -119,6 +133,9 @@ async def _enrich_item(
     reviews = detail.get("reviews") or []
     editorial_summary = detail.get("editorial_summary")
     opening_hours = detail.get("opening_hours") or {}
+
+    if item.get("_needs_ramen_review_revival"):
+        item["_revived_by_ramen_review"] = _has_ramen_in_reviews(reviews)
 
     category_task = extract_ramen_category_mentions(editorial_summary, reviews)
     summary_task = summarize_reviews_30(reviews)
@@ -286,6 +303,14 @@ def _is_open_at_datetime(opening_hours: dict[str, object], search_datetime: str 
                 return True
             span_day = (span_day + 1) % 7
 
+    return False
+
+
+def _has_ramen_in_reviews(reviews: list[dict[str, object]]) -> bool:
+    for review in reviews:
+        text = review.get("text")
+        if isinstance(text, str) and "ラーメン" in text:
+            return True
     return False
 
 
