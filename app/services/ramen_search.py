@@ -24,10 +24,21 @@ _MIN_RESULTS_FOR_STOP = 3
 RAMEN_KEYWORDS = (
     "ラーメン",
     "らーめん",
+    "らぁめん",
+    "拉麺",
     "中華そば",
+    "中華ソバ",
+    "支那そば",
+    "しなそば",
     "つけ麺",
+    "つけめん",
+    "つけそば",
     "油そば",
+    "油ソバ",
     "まぜそば",
+    "混ぜそば",
+    "まぜ麺",
+    "まぜめん",
 )
 NON_RAMEN_KEYWORDS = (
     "喫茶",
@@ -326,8 +337,21 @@ def _is_open_at_datetime(opening_hours: dict[str, object], search_datetime: str 
 
 
 def _contains_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
-    lowered = text.lower()
-    return any(keyword.lower() in lowered for keyword in keywords)
+    lowered = _normalize_keyword_text(text)
+    return any(_normalize_keyword_text(keyword) in lowered for keyword in keywords)
+
+
+def _normalize_keyword_text(text: str) -> str:
+    normalized = text.lower()
+    normalized = normalized.translate(str.maketrans(
+        "ァィゥェォャュョッヮー",
+        "ぁぃぅぇぉゃゅょっゎー",
+    ))
+    normalized = normalized.replace("メン", "めん")
+    normalized = normalized.replace("ソバ", "そば")
+    normalized = normalized.replace("ｰ", "ー")
+    normalized = re.sub(r"\s+", "", normalized)
+    return normalized
 
 
 def _has_ramen_signal(text: str) -> bool:
@@ -369,7 +393,7 @@ def _should_exclude_non_ramen_shop(
     ]
     has_ramen_in_name = _has_ramen_signal(name)
     has_non_ramen_in_name = _has_non_ramen_signal(name)
-    has_ramen_type = any("ramen" in t or "noodle" in t for t in types)
+    has_ramen_type = any("ramen" in t for t in types)
     has_non_ramen_type = bool(types.intersection(NON_RAMEN_TYPES))
 
     # 店名/業態が明確に非ラーメンのときは、口コミノイズに引っ張られないよう先に除外
