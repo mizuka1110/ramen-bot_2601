@@ -21,6 +21,28 @@ _ENRICH_TOTAL_TIMEOUT_SEC = 12.0
 _SEARCH_RADII_M = (1000, 2000, 3000)
 _MIN_RESULTS_FOR_STOP = 3
 
+RAMEN_KEYWORDS = (
+    "ラーメン",
+    "らーめん",
+    "中華そば",
+    "つけ麺",
+    "油そば",
+    "まぜそば",
+)
+NON_RAMEN_KEYWORDS = (
+    "喫茶",
+    "カフェ",
+    "coffee",
+    "居酒屋",
+    "弁当",
+    "定食",
+)
+NON_RAMEN_TYPES = {
+    "cafe",
+    "bar",
+    "bakery",
+}
+
 
 async def search_ramen_items(
     lat: float,
@@ -81,16 +103,10 @@ async def search_ramen_items(
     # Enrich all candidates before sorting so preference weights are reflected.
     await enrich_items(items, search_datetime=search_datetime)
 
-    items = [
-        item
-        for item in items
-        if not item.get("_needs_ramen_review_revival")
-        or bool(item.get("_revived_by_ramen_review"))
-    ]
+    items = [item for item in items if not item.get("_exclude_as_non_ramen")]
 
     for item in items:
-        item.pop("_needs_ramen_review_revival", None)
-        item.pop("_revived_by_ramen_review", None)
+        item.pop("_exclude_as_non_ramen", None)
 
     if not items:
         return [], had_error, False, used_radius
@@ -134,8 +150,11 @@ async def _enrich_item(
     editorial_summary = detail.get("editorial_summary")
     opening_hours = detail.get("opening_hours") or {}
 
-    if item.get("_needs_ramen_review_revival"):
-        item["_revived_by_ramen_review"] = _has_ramen_in_reviews(reviews)
+    item["_exclude_as_non_ramen"] = _should_exclude_non_ramen_shop(
+        item=item,
+        reviews=reviews,
+        editorial_summary=editorial_summary,
+    )
 
     category_task = extract_ramen_category_mentions(editorial_summary, reviews)
     summary_task = summarize_reviews_30(reviews)
@@ -306,12 +325,74 @@ def _is_open_at_datetime(opening_hours: dict[str, object], search_datetime: str 
     return False
 
 
-def _has_ramen_in_reviews(reviews: list[dict[str, object]]) -> bool:
-    for review in reviews:
-        text = review.get("text")
-        if isinstance(text, str) and "ラーメン" in text:
-            return True
-    return False
+def _contains_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(keyword.lower() in lowered for keyword in keywords)
+
+
+def _has_ramen_signal(text: str) -> bool:
+    return _contains_any_keyword(text, RAMEN_KEYWORDS)
+
+
+def _has_non_ramen_signal(text: str) -> bool:
+    return _contains_any_keyword(text, NON_RAMEN_KEYWORDS)
+
+
+def _should_exclude_non_ramen_shop(
+    item: dict[str, object],
+    reviews: list[dict[str, object]],
+    editorial_summary: str | None,
+) -> bool:
+    name = (item.get("name") or "") if isinstance(item.get("name"), str) else ""
+    types = {
+        t.lower()
+        for t in (item.get("types") or [])
+        if isinstance(t, str)
+    }
+    summary = editorial_summary or ""
+
+    review_texts = [
+        text
+        for review in reviews
+        for text in [review.get("text")]
+        if isinstance(text, str) and text.strip()
+    ]
+    menu_texts = [
+        t
+        for t in [item.get("menu_text"), item.get("menu_summary")]
+        if isinstance(t, str) and t.strip()
+    ]
+    photo_texts = [
+        t
+        for t in [item.get("photo_caption"), item.get("photo_description")]
+        if isinstance(t, str) and t.strip()
+    ]
+
+    ramen_signals = [
+        _has_ramen_signal(name),
+        any("ramen" in t or "noodle" in t for t in types),
+        _has_ramen_signal(summary),
+        any(_has_ramen_signal(text) for text in review_texts),
+        any(_has_ramen_signal(text) for text in menu_texts),
+        any(_has_ramen_signal(text) for text in photo_texts),
+    ]
+    if any(ramen_signals):
+        return False
+
+    non_ramen_signals = [
+        _has_non_ramen_signal(name),
+        bool(types.intersection(NON_RAMEN_TYPES)),
+        _has_non_ramen_signal(summary),
+        any(_has_non_ramen_signal(text) for text in review_texts),
+    ]
+
+    if not any(non_ramen_signals):
+        return False
+
+    if not review_texts and not summary:
+        return False
+
+    return True
 
 
 async def enrich_items(items: list[dict[str, object]], search_datetime: str | None = None) -> None:

@@ -1,5 +1,6 @@
-import httpx
 import math
+
+import httpx
 from app.config import GOOGLE_PLACES_API_KEY, GOOGLE_NEARBY_URL
 
 GOOGLE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -17,11 +18,6 @@ NON_STORE_KEYWORDS = (
 
     # 完全除外
     "ピザ", "pizza", "PIZZA",
-)
-
-REVIVABLE_KEYWORDS = (
-    "うどん",
-    "居酒屋",
 )
 
 FOOD_PLACE_TYPES = {
@@ -134,27 +130,30 @@ def _flat_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
     return int(round(math.sqrt(dx * dx + dy * dy) * 1000))
 
 
-def _is_ramen_shop_candidate(place: dict) -> tuple[bool, bool]:
+def _is_ramen_shop_candidate(place: dict) -> bool:
     name = (place.get("name") or "").strip()
     if any(keyword in name for keyword in NON_STORE_KEYWORDS):
-        return False, False
-
-    needs_ramen_review_revival = any(keyword in name for keyword in REVIVABLE_KEYWORDS)
+        return False
 
     types = set(place.get("types") or [])
 
     if types.intersection(EXCLUDE_TYPES):
-        return False, False
+        return False
 
-    return bool(types.intersection(FOOD_PLACE_TYPES)), needs_ramen_review_revival
+    return bool(types.intersection(FOOD_PLACE_TYPES))
 
 
-def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit: int = 10) -> list[dict]:
+def nearby_result_to_items(
+    result: dict,
+    user_lat: float,
+    user_lng: float,
+    limit: int = 10,
+) -> list[dict]:
     raw_items = result.get("results") or []
 
     items: list[dict] = []
     for r in raw_items:
-        is_candidate, needs_ramen_review_revival = _is_ramen_shop_candidate(r)
+        is_candidate = _is_ramen_shop_candidate(r)
         if not is_candidate:
             continue
 
@@ -173,10 +172,12 @@ def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit
                 "open_now": (r.get("opening_hours") or {}).get("open_now"),
                 "rating": r.get("rating"),
                 "rating_count": r.get("user_ratings_total"),
-                "photo_reference": ((r.get("photos") or [{}])[0].get("photo_reference")),
+                "photo_reference": (
+                    (r.get("photos") or [{}])[0].get("photo_reference")
+                ),
                 "place_id": r.get("place_id"),
+                "types": r.get("types") or [],
                 "distance_m": _flat_distance_m(user_lat, user_lng, lat, lng),
-                "_needs_ramen_review_revival": needs_ramen_review_revival,
             }
         )
 
