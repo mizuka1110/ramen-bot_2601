@@ -379,11 +379,20 @@ def _should_exclude_non_ramen_shop(
     if any(ramen_signals):
         return False
 
+    review_non_ramen_hits = sum(
+        1 for text in review_texts if _has_non_ramen_signal(text)
+    )
+    review_ramen_hits = sum(
+        1 for text in review_texts if _has_ramen_signal(text)
+    )
+
+    if review_non_ramen_hits >= 3 and review_ramen_hits == 0:
+        return True
+
     non_ramen_signals = [
         _has_non_ramen_signal(name),
         bool(types.intersection(NON_RAMEN_TYPES)),
         _has_non_ramen_signal(summary),
-        any(_has_non_ramen_signal(text) for text in review_texts),
     ]
 
     if not any(non_ramen_signals):
