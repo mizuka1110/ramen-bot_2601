@@ -14,6 +14,14 @@ NON_STORE_KEYWORDS = (
     "モニュメント", "記念碑", "像",
     "ミュージアム", "博物館",
     "ファクトリー", "工場",
+
+    # 完全除外
+    "ピザ", "pizza", "PIZZA",
+)
+
+REVIVABLE_KEYWORDS = (
+    "うどん",
+    "居酒屋",
 )
 
 FOOD_PLACE_TYPES = {
@@ -126,17 +134,19 @@ def _flat_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
     return int(round(math.sqrt(dx * dx + dy * dy) * 1000))
 
 
-def _is_ramen_shop_candidate(place: dict) -> bool:
+def _is_ramen_shop_candidate(place: dict) -> tuple[bool, bool]:
     name = (place.get("name") or "").strip()
     if any(keyword in name for keyword in NON_STORE_KEYWORDS):
-        return False
+        return False, False
+
+    needs_ramen_review_revival = any(keyword in name for keyword in REVIVABLE_KEYWORDS)
 
     types = set(place.get("types") or [])
 
     if types.intersection(EXCLUDE_TYPES):
-        return False
+        return False, False
 
-    return bool(types.intersection(FOOD_PLACE_TYPES))
+    return bool(types.intersection(FOOD_PLACE_TYPES)), needs_ramen_review_revival
 
 
 def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit: int = 10) -> list[dict]:
@@ -144,7 +154,8 @@ def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit
 
     items: list[dict] = []
     for r in raw_items:
-        if not _is_ramen_shop_candidate(r):
+        is_candidate, needs_ramen_review_revival = _is_ramen_shop_candidate(r)
+        if not is_candidate:
             continue
 
         loc = (r.get("geometry") or {}).get("location") or {}
@@ -165,6 +176,7 @@ def nearby_result_to_items(result: dict, user_lat: float, user_lng: float, limit
                 "photo_reference": ((r.get("photos") or [{}])[0].get("photo_reference")),
                 "place_id": r.get("place_id"),
                 "distance_m": _flat_distance_m(user_lat, user_lng, lat, lng),
+                "_needs_ramen_review_revival": needs_ramen_review_revival,
             }
         )
 
