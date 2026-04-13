@@ -18,33 +18,74 @@ def _addict_multiplier(raw_count: int) -> float:
     return 1.3
 
 
+def _normalized_preference_weight(category: str, weights: dict[str, float]) -> float:
+    weight = weights.get(category, 0.0) or 0.0
+    if weight:
+        return float(weight)
+
+    if category == "二郎":
+        return float(weights.get("二郎系", 0.0) or 0.0)
+    if category == "二郎系":
+        return float(weights.get("二郎", 0.0) or 0.0)
+
+    return 0.0
+
+
+def _jiro_name_bonus(
+    item: dict,
+    weights: dict[str, float],
+    has_jiro_signal: bool,
+) -> float:
+    if not has_jiro_signal:
+        return 0.0
+
+    jiro_weight = max(
+        float(weights.get("二郎", 0.0) or 0.0),
+        float(weights.get("二郎系", 0.0) or 0.0),
+    )
+    if jiro_weight < 1.0:
+        return 0.0
+
+    name = item.get("name")
+    if not isinstance(name, str):
+        return 0.0
+
+    return 1.5 if "二郎" in name else 0.0
+
+
 def _preference_score(item: dict, weights: dict[str, float]) -> tuple[float, float]:
     mentions = item.get("category_mentions")
     if not isinstance(mentions, dict):
         categories = item.get("categories") or []
-        base_score = sum(weights.get(c, 0) for c in categories)
+        has_jiro_signal = any(c == "二郎" for c in categories if isinstance(c, str))
+        base_score = sum(_normalized_preference_weight(c, weights) for c in categories)
         addict_bonus = (
-            1.05 if any((weights.get(c) or 0) >= 1.0 for c in categories) else 0.0
+            1.05
+            if any(_normalized_preference_weight(c, weights) >= 1.0 for c in categories)
+            else 0.0
         )
-        return base_score, addict_bonus
+        return base_score, addict_bonus + _jiro_name_bonus(item, weights, has_jiro_signal)
 
     base_score = 0.0
     addict_bonus = 0.0
+    has_jiro_signal = False
 
     for category, raw_count in mentions.items():
         if not isinstance(category, str):
             continue
         if not isinstance(raw_count, int) or raw_count <= 0:
             continue
+        if category == "二郎":
+            has_jiro_signal = True
 
-        weight = weights.get(category, 0.0) or 0.0
+        weight = _normalized_preference_weight(category, weights)
         if weight >= 1.0:
             addict_bonus += _addict_multiplier(raw_count)
             continue
 
         base_score += float(weight) * raw_count
 
-    return base_score, addict_bonus
+    return base_score, addict_bonus + _jiro_name_bonus(item, weights, has_jiro_signal)
 
 
 def _total_score(item: dict, weights: dict[str, float]) -> float:
