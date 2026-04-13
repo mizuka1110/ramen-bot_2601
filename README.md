@@ -1,165 +1,199 @@
-# LINEラーメン推薦Bot
+# LINE ラーメン検索 Bot（現状仕様）
 
-## 1. 目的
+この README は、**現在の実装コードに合わせた仕様書**です。
+（要件メモではなく、2026-04-13 時点の挙動ベース）
 
-スマホ利用を前提に、LINE上で  
-**「現在地周辺のラーメン店」** を検索し、  
-**ユーザーの過去対話から学習した嗜好を反映して、理由つきで候補を提案する。**
+## 1. 概要
 
----
+本アプリは、LINE Messaging API を入口にして、ユーザーが送った位置情報をもとに近隣のラーメン店を検索・ランキングし、Flex Message で返す FastAPI サーバです。
 
-## 2. 対象ユーザー
+- 店舗検索: Google Places API（Nearby Search / Place Details / Photo）
+- 要約・カテゴリ抽出: OpenAI Responses API（`gpt-4o-mini`）
+- 嗜好保存: PostgreSQL（`user_preferences` テーブル）
+- UI補助: LIFF ページ（好み登録・日時指定）
 
-- 外出中に、近くのラーメン店を**素早く決めたい**スマホユーザー  
-- 好み（例：こってりが好き / 辛いのが苦手 など）を  
-  **毎回説明したくない**ユーザー
+## 2. 主要機能
 
----
+### 2.1 LINE Webhook
 
-## 3. ユースケース
+- エンドポイント: `POST /line/webhook`
+- 受信イベント:
+  - テキストメッセージ
+  - 位置情報メッセージ
+  - ポストバック（「おかわり」「好み登録」系）
+- GET 疎通確認: `GET /line/webhook` -> `{ "status": "ok" }`
 
-- 「今いる場所の近くでラーメンを探したい」
-- 「辛いのが苦手」「こってりが好き」など  
-  **嗜好を踏まえた提案**がほしい
-- 過去に伝えた嗜好を  
-  **次回以降も自動的に反映**してほしい
+### 2.2 テキスト入力時の挙動
 
----
+主なキーワードと動作:
 
-## 4. 機能要件（MVP）
+- 「今すぐ検索」「ラーメン」を含む:
+  - 即時検索モードに入り、位置情報 Quick Reply を返す
+- 「日時・場所を指定」または「場所・日時を指定」を含む:
+  - 日時指定 LIFF への導線 Flex を返す
+- `日時指定:YYYY-MM-DDTHH:MM` 形式:
+  - サーバ内セッションに日時を保存し、位置情報送信を促す
+- 「好み」を含む:
+  - 好み登録 LIFF（固定URL）への導線 Flex を返す
 
-### 必須機能
+### 2.3 位置情報入力時の検索フロー
 
-#### 1) LINEでの対話
+位置情報受信時は `search_ramen_items` を実行します。
 
-- **ユーザー入力**
-  - テキスト（例：「ラーメン」）
-  - 位置情報（現在地 or 地名）
-- **Bot出力**
-  - 候補3件を**カルーセル形式**で提示  
-    - 店名  
-    - 評価  
-    - 営業時間  
-    - おすすめ理由  
-    - 地図リンク  
+1. 検索半径を `1000m -> 2000m -> 3000m` と段階的に拡張
+2. Places 結果を重複排除して候補を収集
+3. 各候補の Place Details から口コミ/営業時間を取得（並列）
+4. OpenAI で以下を付与
+   - 高評価口コミの短文要約
+   - ラーメンカテゴリ mention 数抽出
+5. ユーザー嗜好（weights）を使ってスコアリングし並び替え
+6. 先頭 10 件を Flex カルーセルで返信
 
----
+補足:
 
-#### 2) 店舗検索（外部知識参照 / RAG要素）
+- 結果が 10 件を超える場合は「おかわり」ボタン（postback）を返す
+- 日時指定モード時は営業情報注記を付与し、同時刻で別地点検索の Quick Reply を返す
+- 半径 2000m 以上に広げた場合は「検索半径を広げた」旨のメッセージを追加
 
-- **Google Places API** を利用し、  
-  「現在地周辺のラーメン店」を検索
-- 取得する情報（例）
-  - 店名
-  - 住所
-  - 評価
-  - 営業時間
-  - Place ID
-  - 地図URL  
-  - （必要に応じて写真）
+### 2.4 おかわり（ページング）
 
----
+- postback data: `ramen:more:{offset}`
+- サーバメモリ上の検索セッションを参照して次ページ（10件）を返却
+- 2ページ目は、初回でプリフェッチ済みデータがあればそれを優先利用
 
-#### 3) OpenAI APIの利用（APIサーバ経由）
+### 2.5 好み登録
 
-- LINEクライアントから直接呼ばず、  
-  **APIサーバ経由で OpenAI API を利用**
-- 利用目的
-  - 候補上位3件それぞれの  
-    **注目の口コミ5件の要約を30字で表示**
-  - 
+#### A. LINE内 Flex UI（postback）
 
-  ##### OpenAI 設定
-- 使用モデル: gpt-4o-mini
-- 環境変数: OPENAI_API_KEY を各自設定
-- responses API を使用（openai>=2.x）
+- `pref:menu` でカテゴリ一覧
+- `pref:category:{category}` で選択肢表示
+- `pref:set:{category}:{choice}` で保存
 
----
+choice と重み:
 
-## 4. 非機能要件（最低限）
-- **嗜好を踏まえた提案**
-  - ユーザーの嗜好を **DBに永続化**
-　-　それを元に結果を提案
-- **セキュリティ**
-  - OpenAI APIキーはサーバ側で管理
-  - クライアント（LINE）には露出しない
-- **可用性 / 運用**
-  - 小規模MVPとして安定稼働すればOK
-  - 大規模スケールは対象外
-- **コスト配慮（設計方針）**
-  - Google Placesの検索結果は  
-    **短期キャッシュ可能な構造**
-  - （実装は任意）
+- `like`: `0.075`
+- `love`: `0.15`
+- `addict`: `1.0`
+- `dislike`: `-0.075`
 
----
+カテゴリ（12種）:
 
-## 6. ディレクトリ構成
+- つけ麺 / まぜそば / 魚介 / 煮干し / 鶏白湯 / 豚骨 / 醤油 / 味噌 / 塩 / 辛い / 家系 / 二郎系
 
-```txt
-├─ app/
-│  ├─ main.py              # FastAPI起点
-│  ├─ line/
-│  │  ├─ webhook.py        # Webhook受信・署名検証
-│  │  └─ messages.py       # テキスト / カルーセル定義
-│  ├─ services/
-│  │  ├─ places_cache.py   # places結果キャッシュ
-│  │  ├─ ai_summary.py     # OpenAI（口コミ要約）
-│  │  ├─ places.py         # Google Places API 呼び出し
-│  │  ├─ llm.py            # OpenAI連携（生成・抽出）
-│  │  └─ profile.py        # DB操作（user_profiles）
-│  ├─ schemas.py           # Pydantic 定義（任意）
-│  └─ config.py            # 環境変数管理
-│
-├─ Dockerfile
-├─ docker-compose.yml
-├─ requirements.txt
-├─ .env.example
-└─ README.md
+#### B. LIFF ページ + API
 
-## 6. ディレクトリ構成
+- LIFF 画面: `GET /preferences`（`app/static/preferences.html`）
+- 保存 API: `POST /api/preferences`
+- 取得 API: `GET /api/preferences?user_id=...`
 
-### テーブル一覧
+### 2.6 日時指定検索（LIFF）
 
-| テーブル名 | 目的 |
-|---|---|
-| `user_profiles` | LINEユーザーごとの嗜好（likes/dislikes/notes）と直近の検索条件を保持 |
+- ページ: `app/static/datetime.html`
+- LIFF から `日時指定:...` テキストを LINE トークへ送信
+- サーバは `opening_hours.periods` を解析して「指定時刻に営業中/時間外」を判定
+- カルーセルで営業時間（当日分テキスト）を表示可能
+
+## 3. ランキング仕様（実装ベース）
+
+総合スコアは概ね次の要素で構成されます。
+
+- `rating`
+- 口コミ件数ペナルティ
+  - 100以上: 0
+  - 75以上: -0.1
+  - 50以上: -0.2
+  - 25以上: -0.3
+  - それ未満: -0.5
+- 嗜好スコア
+  - 抽出されたカテゴリ mention 数 × ユーザー重み
+- 中毒ボーナス
+  - 重み `>= 1.0` のカテゴリは mention 数に応じて追加ボーナス
+
+並び順:
+
+- 通常検索（現在時刻ベース）: `open_now` を優先しつつスコア降順
+- 日時指定検索: `open_at_search_time` を優先しつつスコア降順
+
+## 4. API 一覧
+
+### 4.1 業務API
+
+- `POST /line/webhook` : LINE イベント受信
+- `GET /line/webhook` : webhook ヘルス
+- `GET /shops/search?lat=...&lng=...&q=...&radius=...` : 周辺検索（内部利用・デバッグ向け）
+- `GET /shops/photo?ref=...&maxwidth=...` : Google Photo のプロキシ
+- `GET /preferences` : 好み登録 LIFF ページ配信
+- `POST /api/preferences` : 好み保存
+- `GET /api/preferences?user_id=...` : 好み取得
+
+### 4.2 運用・デバッグAPI
+
+- `POST /debug/push?lat=...&lng=...` : 指定ユーザーへテスト Push
+- `GET /health` : アプリヘルス
+- `GET /health/db` : DBヘルス
+
+## 5. データ仕様
+
+### 5.1 DB テーブル
+
+`user_preferences` テーブルを利用します。
+
+想定カラム:
+
+- `line_user_id` (text, PK)
+- `weights` (jsonb)
+- `updated_at` (timestamp)
+
+※ アプリ起動時に自動マイグレーションは実装されていないため、事前にテーブル作成が必要です。
+
+## 6. 環境変数
+
+必須（主に本番運用で必要）:
+
+- `LINE_CHANNEL_ACCESS_TOKEN`
+- `PLACES_API_KEY`
+- `OPENAI_API_KEY`
+- `PUBLIC_BASE_URL`（画像URL/Flex内リンク生成）
+
+DB 接続系（優先順）:
+
+1. `SUPABASE_DB_URL`
+2. `DATABASE_URL`
+3. `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD`
+
+任意:
+
+- `DATETIME_LIFF_ID`（未設定時デフォルトあり）
+- `DATETIME_LIFF_URL`
+- `ENV`（`.env.{ENV}` を読み込み。未指定は `development`）
+- `LINE_USER_ID`（`/debug/push` 用）
+
+## 7. ローカル実行
+
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
----
 
-### テーブル定義：`user_profiles`
+または Docker:
 
-| カラム名 | 型 | 制約 | 説明 |
-|---|---|---|---|
-| `line_user_id` | text | PRIMARY KEY | LINEのユーザーID |
-| `prefs` | jsonb | NOT NULL | ユーザー嗜好データ（JSON） |
-| `created_at` | timestamptz | NOT NULL | 作成日時 |
-| `updated_at` | timestamptz | NOT NULL | 更新日時 |
+```bash
+docker compose up --build
+```
 
----
+`docker-compose.yml` は `api:8000` を公開し、`.env.development` を読み込みます。
 
-### `prefs`（jsonb）キー定義
+## 8. 現状の制約 / 注意点
 
-| キー | 型 | 説明 |
-|---|---|---|
-| `likes` | array[string] | 好きな傾向（例：豚骨、こってり、つけ麺） |
-| `dislikes` | array[string] | 苦手な傾向（例：辛い、魚介強め） |
-| `notes` | string | 補足（例：並ぶのが苦手、夜遅め希望） |
-| `last_query` | string | 直近の検索ワード（例：ラーメン） |
-| `last_location.lat` | number | 直近の緯度 |
-| `last_location.lng` | number | 直近の経度 |
+- ユーザー状態・検索セッションは**プロセスメモリ保持**（再起動で消える）
+- Webhook 署名検証は未実装（リクエストJSONを直接処理）
+- LIFF URL の一部はコード内固定値
+- OpenAI/Places の失敗時は、可能な範囲でフォールバックして返信
 
 ---
 
-### `prefs` の例
-
-```json
-{
-  "likes": ["豚骨", "こってり"],
-  "dislikes": ["辛い", "魚介強め"],
-  "notes": "並ぶのが苦手",
-  "last_query": "ラーメン",
-  "last_location": {
-    "lat": 35.6812,
-    "lng": 139.7671
-  }
-}
+必要であれば次のステップで、
+- 「運用手順書（デプロイ手順）」
+- 「DB 初期化 SQL」
+- 「LINE Developers 側の設定手順」
+まで README に追記できます。
