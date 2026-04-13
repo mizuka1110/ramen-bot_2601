@@ -367,10 +367,20 @@ def _should_exclude_non_ramen_shop(
         for t in [item.get("photo_caption"), item.get("photo_description")]
         if isinstance(t, str) and t.strip()
     ]
+    has_ramen_in_name = _has_ramen_signal(name)
+    has_non_ramen_in_name = _has_non_ramen_signal(name)
+    has_ramen_type = any("ramen" in t or "noodle" in t for t in types)
+    has_non_ramen_type = bool(types.intersection(NON_RAMEN_TYPES))
+
+    # 店名/業態が明確に非ラーメンのときは、口コミノイズに引っ張られないよう先に除外
+    if has_non_ramen_in_name and not has_ramen_in_name:
+        return True
+    if has_non_ramen_type and not has_ramen_type and not has_ramen_in_name:
+        return True
 
     ramen_signals = [
-        _has_ramen_signal(name),
-        any("ramen" in t or "noodle" in t for t in types),
+        has_ramen_in_name,
+        has_ramen_type,
         _has_ramen_signal(summary),
         any(_has_ramen_signal(text) for text in review_texts),
         any(_has_ramen_signal(text) for text in menu_texts),
@@ -390,8 +400,8 @@ def _should_exclude_non_ramen_shop(
         return True
 
     non_ramen_signals = [
-        _has_non_ramen_signal(name),
-        bool(types.intersection(NON_RAMEN_TYPES)),
+        has_non_ramen_in_name,
+        has_non_ramen_type,
         _has_non_ramen_signal(summary),
     ]
 
