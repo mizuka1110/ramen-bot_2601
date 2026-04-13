@@ -93,26 +93,90 @@ choice と重み:
 - サーバは `opening_hours.periods` を解析して「指定時刻に営業中/時間外」を判定
 - カルーセルで営業時間（当日分テキスト）を表示可能
 
-## 3. ランキング仕様（実装ベース）
+## 3. ランキング仕様（実装ベース・詳細）
 
-総合スコアは概ね次の要素で構成されます。
+このセクションは `app/services/ranking.py` の実装ロジックを、そのまま仕様として読めるように整理したものです。
+
+### 3.1 まず何で並べるか（営業状態の優先）
+
+検索モードで優先キーが変わります。
+
+- 通常検索（現在時刻ベース / `prioritize_open_now_status=True`）
+  1. `open_now` の優先度
+     - `True`（営業中） -> 最優先
+     - `None`（不明） -> 次点
+     - `False`（営業時間外） -> 最後
+  2. 上記が同じなら `total_score` 降順
+
+- 日時指定検索（`prioritize_open_now_status=False`）
+  1. 「実効的に営業中か」を優先
+     - `open_at_search_time` が bool のときはそれを採用
+     - それ以外（未判定など）は `open_now is True` を代替採用
+  2. 営業中グループ内 / 非営業グループ内で `total_score` 降順
+
+### 3.2 総合スコア `total_score` の式
+
+スコアは次式です。
+
+```text
+total_score = rating + preference_score + addict_bonus + review_penalty
+```
 
 - `rating`
-- 口コミ件数ペナルティ
-  - 100以上: 0
-  - 75以上: -0.1
-  - 50以上: -0.2
-  - 25以上: -0.3
-  - それ未満: -0.5
-- 嗜好スコア
-  - 抽出されたカテゴリ mention 数 × ユーザー重み
-- 中毒ボーナス
-  - 重み `>= 1.0` のカテゴリは mention 数に応じて追加ボーナス
+  - Places の店舗評価（未取得時は `0`）
+- `preference_score`
+  - ユーザー嗜好（weights）とカテゴリ言及数から算出
+- `addict_bonus`
+  - 「中毒（weight >= 1.0）」カテゴリに対する追加ボーナス
+- `review_penalty`
+  - 口コミ件数（`rating_count`）が少ない店舗への控えめな減点
 
-並び順:
+### 3.3 口コミ件数ペナルティ `review_penalty`
 
-- 通常検索（現在時刻ベース）: `open_now` を優先しつつスコア降順
-- 日時指定検索: `open_at_search_time` を優先しつつスコア降順
+`rating_count` による段階減点です。
+
+- 100件以上: `0`
+- 75〜99件: `-0.1`
+- 50〜74件: `-0.2`
+- 25〜49件: `-0.3`
+- 24件以下: `-0.5`
+
+### 3.4 嗜好スコア `preference_score` / 中毒ボーナス `addict_bonus`
+
+#### A. 通常系（`category_mentions` が dict である場合）
+
+OpenAI が抽出したカテゴリ mention 数（正の整数のみ採用）を使います。
+
+- `weight < 1.0` のカテゴリ:
+  - `preference_score += weight * mention_count`
+- `weight >= 1.0`（中毒）のカテゴリ:
+  - `preference_score` には加算しない
+  - 代わりに `addict_bonus` に下記を加算
+    - mention_count <= 1 : `+1.05`
+    - mention_count <= 3 : `+1.15`
+    - mention_count >= 4 : `+1.3`
+
+> 補足: 中毒カテゴリは「線形加点（weight * count）」ではなく、専用ボーナスで強めに効かせる設計です。
+
+#### B. フォールバック系（`category_mentions` が dict でない場合）
+
+旧データ等で mention 辞書が無い場合、`categories` 配列を使って簡易計算します。
+
+- `preference_score = Σ weights[category]`
+- `addict_bonus = 1.05`（`weights[category] >= 1.0` が1つでもあれば）
+
+### 3.5 同点時の扱い
+
+Python の `sorted()` は安定ソートのため、
+
+- 優先キー（営業状態）と `total_score` が完全同値の要素同士は、
+- ソート前の順序（= 収集順）を保持します。
+
+### 3.6 実運用上の見え方（要点）
+
+- まず「営業中（または指定時刻営業中）」が上に来る。
+- その中で、`rating` を基礎点に「嗜好一致」と「中毒ボーナス」が上乗せされる。
+- ただし口コミ件数が極端に少ない店は、最大 `-0.5` の減点で少し抑制される。
 
 ## 4. API 一覧
 
