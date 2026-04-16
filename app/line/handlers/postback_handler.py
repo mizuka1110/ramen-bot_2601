@@ -95,6 +95,7 @@ async def handle_postback(
             build_flex_carousel(
                 items,
                 show_business_hours=False,
+                show_rank_badges=False,
             )
         ]
         next_offset = offset + 10
