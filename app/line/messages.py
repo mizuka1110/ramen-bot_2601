@@ -385,6 +385,7 @@ def shop_to_bubble(
     item: dict,
     show_business_hours: bool = False,
     rank: int | None = None,
+    show_rank_badge: bool = True,
 ) -> dict:
     place_url = f"https://www.google.com/maps/place/?q=place_id:{item['place_id']}"
     is_open_at_search_time = show_business_hours and item.get("open_at_search_time") is True
@@ -442,7 +443,7 @@ def shop_to_bubble(
         "maxWidth": "112px",
         "flex": 0,
     }
-    rank_badge = _build_rank_badge(rank)
+    rank_badge = _build_rank_badge(rank) if show_rank_badge else None
     if rank_badge:
         rank_badge["position"] = "absolute"
         rank_badge["offsetStart"] = "10px"
@@ -595,6 +596,7 @@ def shop_to_bubble(
 def build_flex_carousel(
     items: list[dict],
     show_business_hours: bool = False,
+    show_rank_badges: bool = True,
 ) -> dict:
     # 念のため None 混入を防ぐ（shop_to_bubbleは基本None返さない想定）
     bubbles = [
@@ -604,6 +606,7 @@ def build_flex_carousel(
                 x,
                 show_business_hours=show_business_hours,
                 rank=i + 1,
+                show_rank_badge=show_rank_badges,
             )
             for i, x in enumerate((items or [])[:10])
         )
