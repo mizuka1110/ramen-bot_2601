@@ -7,6 +7,7 @@ GOOGLE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 NON_STORE_KEYWORDS = (
     # 飲食店（ラーメン以外のジャンル）
     "寿司", "すし", "鮨",
+    "そば処",
     "とんかつ",
     "焼肉", "焼き肉",
     "天ぷら", "てんぷら",
