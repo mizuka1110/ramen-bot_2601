@@ -45,6 +45,7 @@ RAMEN_KEYWORDS = (
     "汁なしラーメン",
 )
 NON_RAMEN_KEYWORDS = (
+    "そば処",
     "喫茶",
     "カフェ",
     "coffee",
